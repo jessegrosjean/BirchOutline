@@ -22,7 +22,9 @@ two.appendChild([three])
 
 print(outline.serialize(nil))
 
-// one:
-//  - two @priority(1)
-//    three
+/*
+one:
+  - two @priority(1)
+    three
+*/
 ```

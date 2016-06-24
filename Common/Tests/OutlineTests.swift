@@ -28,6 +28,7 @@ class OutlineTests: XCTestCase {
     func testInit() {
         XCTAssertNotNil(outline)
         XCTAssertEqual(outline.root.firstChild!.firstChild!.body, "two")
+        
     }
 
     func testRemoveFromParent() {

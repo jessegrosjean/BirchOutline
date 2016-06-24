@@ -23,6 +23,7 @@ public protocol ItemType: AnyObject {
     var children: [ItemType] { get }
 
     func insertChildren(children: [ItemType], beforeSibling: ItemType?)
+    func appendChildren(children: [ItemType])
     func removeChildren(children: [ItemType])
     func removeFromParent()
 
@@ -78,9 +79,13 @@ extension JSValue: ItemType {
         }
     }
 
+    public func appendChildren(children: [ItemType]) {
+        let mapped: [AnyObject] = children.map { $0 }
+        invokeMethod("appendChildren", withArguments: [mapped])
+    }
+    
     public func removeChildren(children: [ItemType]) {
         let mapped: [AnyObject] = children.map { $0 }
-        
         invokeMethod("removeChildren", withArguments: [mapped])
     }
     

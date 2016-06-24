@@ -578,6 +578,7 @@
 				INFOPLIST_FILE = BirchOutline/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutline;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -598,6 +599,7 @@
 				INFOPLIST_FILE = BirchOutline/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutline;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -637,7 +639,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				INFOPLIST_FILE = BirchOutlineiOS/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.3;
+				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutlineiOS;
 				PRODUCT_NAME = BirchOutline;
@@ -657,7 +659,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				INFOPLIST_FILE = BirchOutlineiOS/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.3;
+				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutlineiOS;
 				PRODUCT_NAME = BirchOutline;
@@ -714,6 +716,7 @@
 				436C0D861D1D56D50089FA7A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		436C0D871D1D56D50089FA7A /* Build configuration list for PBXNativeTarget "BirchOutlineTests" */ = {
 			isa = XCConfigurationList;
@@ -722,6 +725,7 @@
 				436C0D891D1D56D50089FA7A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		436C0DC31D1D63630089FA7A /* Build configuration list for PBXNativeTarget "BirchOutlineiOS" */ = {
 			isa = XCConfigurationList;
@@ -730,6 +734,7 @@
 				436C0DC51D1D63630089FA7A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		436C0DC61D1D63630089FA7A /* Build configuration list for PBXNativeTarget "BirchOutlineiOSTests" */ = {
 			isa = XCConfigurationList;
@@ -738,6 +743,7 @@
 				436C0DC81D1D63630089FA7A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

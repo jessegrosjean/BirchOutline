@@ -11,7 +11,7 @@ import JavaScriptCore
 
 extension JSValue {
     
-    func selfOrNil() -> JSValue? {
+    public func selfOrNil() -> JSValue? {
         if isNull || isUndefined {
             return nil
         }

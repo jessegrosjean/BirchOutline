@@ -9,7 +9,7 @@ It's in pre-release now, but I think it's suitable for reading, processing, and 
 ```swift
 import BirchOutline
 
-let outline = Birch.createTaskPaperOutline("one:")
+let outline = BirchOutline.createTaskPaperOutline("one:")
 let one = outline.root.firstChild
 
 let two = outline.createItem("two")

@@ -18,7 +18,7 @@ class OutlineTests: XCTestCase {
         super.setUp()
         let path = NSBundle(forClass: self.dynamicType).pathForResource("Outline", ofType: "txt")!
         let textContents = try! NSString(contentsOfFile: path, encoding: NSUTF8StringEncoding)
-        outline = Birch.createTaskPaperOutline(textContents as String)
+        outline = BirchOutline.createTaskPaperOutline(textContents as String)
     }
     
     override func tearDown() {

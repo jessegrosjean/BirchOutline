@@ -59,6 +59,14 @@ public class JavaScriptContext {
         context.evaluateScript(script)
     }
     
+    public func createOutline(type: String?, content: String?) -> OutlineType {
+        return jsOutlineClass.constructWithArguments([type ?? "text/plain", content ?? ""])
+    }
+    
+    public func createTaskPaperOutline(content: String?) -> OutlineType {
+        return jsOutlineClass.constructWithArguments(["text/taskpaper", content ?? ""])
+    }
+    
 }
 
 func setExceptionHandler(context: JSContext) {

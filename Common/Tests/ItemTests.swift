@@ -18,7 +18,7 @@ class ItemTests: XCTestCase {
     override func setUp() {
         super.setUp()
         
-        outline = Birch.createTaskPaperOutline(nil)
+        outline = BirchOutline.createTaskPaperOutline(nil)
         item = outline.createItem("hello")
     }
     

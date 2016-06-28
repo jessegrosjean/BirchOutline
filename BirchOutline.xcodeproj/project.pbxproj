@@ -11,8 +11,8 @@
 		436C0D7B1D1D56D50089FA7A /* BirchOutline.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 436C0D701D1D56D50089FA7A /* BirchOutline.framework */; };
 		436C0DB51D1D63630089FA7A /* BirchOutlineiOS.h in Headers */ = {isa = PBXBuildFile; fileRef = 436C0DB41D1D63630089FA7A /* BirchOutlineiOS.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		436C0DBC1D1D63630089FA7A /* BirchOutline.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 436C0DB21D1D63630089FA7A /* BirchOutline.framework */; };
-		436C0DDE1D1D64D30089FA7A /* Birch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD01D1D64CC0089FA7A /* Birch.swift */; };
-		436C0DDF1D1D64D40089FA7A /* Birch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD01D1D64CC0089FA7A /* Birch.swift */; };
+		436C0DDE1D1D64D30089FA7A /* BirchOutline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */; };
+		436C0DDF1D1D64D40089FA7A /* BirchOutline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */; };
 		436C0DE21D1D65090089FA7A /* ItemType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD31D1D64CC0089FA7A /* ItemType.swift */; };
 		436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD31D1D64CC0089FA7A /* ItemType.swift */; };
 		436C0DE41D1D650C0089FA7A /* JavaScriptContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD41D1D64CC0089FA7A /* JavaScriptContext.swift */; };
@@ -27,12 +27,12 @@
 		436C0DEF1D1D65210089FA7A /* JavaScriptContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDA1D1D64CC0089FA7A /* JavaScriptContextTests.swift */; };
 		436C0DF01D1D65230089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
 		436C0DF11D1D65240089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
-		436C0DF21D1D65640089FA7A /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DD11D1D64CC0089FA7A /* birchoutline.js */; };
-		436C0DF31D1D65650089FA7A /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DD11D1D64CC0089FA7A /* birchoutline.js */; };
 		436C0DF41D1D65770089FA7A /* Outline.txt in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDC1D1D64CC0089FA7A /* Outline.txt */; };
 		436C0DF51D1D65770089FA7A /* Outline.txt in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDC1D1D64CC0089FA7A /* Outline.txt */; };
 		436C0DF61D1D657B0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
 		436C0DF71D1D657C0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
+		43E6193B1D232043001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6193A1D232043001E3F4D /* birchoutline.js */; };
+		43E6193C1D232043001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6193A1D232043001E3F4D /* birchoutline.js */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,8 +63,7 @@
 		436C0DB61D1D63630089FA7A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		436C0DBB1D1D63630089FA7A /* BirchOutlineiOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BirchOutlineiOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		436C0DC21D1D63630089FA7A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		436C0DD01D1D64CC0089FA7A /* Birch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Birch.swift; sourceTree = "<group>"; };
-		436C0DD11D1D64CC0089FA7A /* birchoutline.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = birchoutline.js; sourceTree = "<group>"; };
+		436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirchOutline.swift; sourceTree = "<group>"; };
 		436C0DD31D1D64CC0089FA7A /* ItemType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemType.swift; sourceTree = "<group>"; };
 		436C0DD41D1D64CC0089FA7A /* JavaScriptContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavaScriptContext.swift; sourceTree = "<group>"; };
 		436C0DD51D1D64CC0089FA7A /* JSValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSValue.swift; sourceTree = "<group>"; };
@@ -74,6 +73,7 @@
 		436C0DDB1D1D64CC0089FA7A /* Outline.bml */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.bml; sourceTree = "<group>"; };
 		436C0DDC1D1D64CC0089FA7A /* Outline.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.txt; sourceTree = "<group>"; };
 		436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineTests.swift; sourceTree = "<group>"; };
+		43E6193A1D232043001E3F4D /* birchoutline.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = birchoutline.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,7 +187,7 @@
 		436C0DCF1D1D64CC0089FA7A /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				436C0DD01D1D64CC0089FA7A /* Birch.swift */,
+				436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */,
 				436C0DD41D1D64CC0089FA7A /* JavaScriptContext.swift */,
 				436C0DFA1D1D65DD0089FA7A /* Outline */,
 				436C0DFB1D1D66380089FA7A /* Util */,
@@ -219,7 +219,7 @@
 		436C0DF91D1D65A40089FA7A /* Support Files */ = {
 			isa = PBXGroup;
 			children = (
-				436C0DD11D1D64CC0089FA7A /* birchoutline.js */,
+				43E6193A1D232043001E3F4D /* birchoutline.js */,
 			);
 			name = "Support Files";
 			sourceTree = "<group>";
@@ -384,7 +384,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				436C0DF21D1D65640089FA7A /* birchoutline.js in Resources */,
+				43E6193B1D232043001E3F4D /* birchoutline.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -401,7 +401,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				436C0DF31D1D65650089FA7A /* birchoutline.js in Resources */,
+				43E6193C1D232043001E3F4D /* birchoutline.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -425,7 +425,7 @@
 				436C0DE41D1D650C0089FA7A /* JavaScriptContext.swift in Sources */,
 				436C0DE21D1D65090089FA7A /* ItemType.swift in Sources */,
 				436C0DE61D1D650F0089FA7A /* JSValue.swift in Sources */,
-				436C0DDE1D1D64D30089FA7A /* Birch.swift in Sources */,
+				436C0DDE1D1D64D30089FA7A /* BirchOutline.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,7 +447,7 @@
 				436C0DE51D1D650D0089FA7A /* JavaScriptContext.swift in Sources */,
 				436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */,
 				436C0DE71D1D65100089FA7A /* JSValue.swift in Sources */,
-				436C0DDF1D1D64D40089FA7A /* Birch.swift in Sources */,
+				436C0DDF1D1D64D40089FA7A /* BirchOutline.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

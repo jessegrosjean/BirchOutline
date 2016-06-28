@@ -20,9 +20,9 @@ class JavaScriptContextTests: XCTestCase {
     }
     
     func testInit() {
-        XCTAssertNotNil(JavaScriptContext.sharedInstance.context)
-        XCTAssertNotNil(JavaScriptContext.sharedInstance.jsBirchOutline)
-        XCTAssertNotNil(JavaScriptContext.sharedInstance.jsOutlineClass)
+        XCTAssertNotNil(BirchOutline.sharedContext.context)
+        XCTAssertNotNil(BirchOutline.sharedContext.jsBirchOutline)
+        XCTAssertNotNil(BirchOutline.sharedContext.jsOutlineClass)
     }
     
 }

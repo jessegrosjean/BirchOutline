@@ -6,16 +6,16 @@
 //  Copyright © 2016 Jesse Grosjean. All rights reserved.
 //
 
-import JavaScriptCore
+public class BirchOutline {
 
-public class Birch {
-    
+    public static var sharedContext = JavaScriptContext()
+
     public static func createOutline(type: String?, content: String?) -> OutlineType {
-        return JavaScriptContext.sharedInstance.jsOutlineClass.constructWithArguments([type ?? "text/plain", content ?? ""])
+        return sharedContext.createOutline(type, content: content)
     }
     
     public static func createTaskPaperOutline(content: String?) -> OutlineType {
-        return JavaScriptContext.sharedInstance.jsOutlineClass.constructWithArguments(["text/taskpaper", content ?? ""])
+        return sharedContext.createTaskPaperOutline(content)
     }
-
+    
 }

@@ -31,10 +31,10 @@
 		436C0DF51D1D65770089FA7A /* Outline.txt in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDC1D1D64CC0089FA7A /* Outline.txt */; };
 		436C0DF61D1D657B0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
 		436C0DF71D1D657C0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
-		43E6193B1D232043001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6193A1D232043001E3F4D /* birchoutline.js */; };
-		43E6193C1D232043001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6193A1D232043001E3F4D /* birchoutline.js */; };
 		43E6193E1D2340B3001E3F4D /* String.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String.swift */; };
 		43E6193F1D2340B3001E3F4D /* String.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String.swift */; };
+		43E619501D244344001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6194F1D244344001E3F4D /* birchoutline.js */; };
+		43E619511D244344001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6194F1D244344001E3F4D /* birchoutline.js */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,8 +75,8 @@
 		436C0DDB1D1D64CC0089FA7A /* Outline.bml */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.bml; sourceTree = "<group>"; };
 		436C0DDC1D1D64CC0089FA7A /* Outline.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.txt; sourceTree = "<group>"; };
 		436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineTests.swift; sourceTree = "<group>"; };
-		43E6193A1D232043001E3F4D /* birchoutline.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = birchoutline.js; sourceTree = "<group>"; };
 		43E6193D1D2340B3001E3F4D /* String.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = String.swift; sourceTree = "<group>"; };
+		43E6194F1D244344001E3F4D /* birchoutline.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = birchoutline.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +116,7 @@
 		436C0D661D1D56D50089FA7A = {
 			isa = PBXGroup;
 			children = (
+				43E6194E1D244344001E3F4D /* Dependencies */,
 				436C0DCE1D1D64CC0089FA7A /* Common */,
 				436C0D721D1D56D50089FA7A /* BirchOutline */,
 				436C0D7E1D1D56D50089FA7A /* BirchOutlineTests */,
@@ -194,7 +195,6 @@
 				436C0DD41D1D64CC0089FA7A /* BirchScriptContext.swift */,
 				436C0DFA1D1D65DD0089FA7A /* Outline */,
 				436C0DFB1D1D66380089FA7A /* Extensions */,
-				436C0DF91D1D65A40089FA7A /* Support Files */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -219,14 +219,6 @@
 			name = Fixtures;
 			sourceTree = "<group>";
 		};
-		436C0DF91D1D65A40089FA7A /* Support Files */ = {
-			isa = PBXGroup;
-			children = (
-				43E6193A1D232043001E3F4D /* birchoutline.js */,
-			);
-			name = "Support Files";
-			sourceTree = "<group>";
-		};
 		436C0DFA1D1D65DD0089FA7A /* Outline */ = {
 			isa = PBXGroup;
 			children = (
@@ -243,6 +235,14 @@
 				43E6193D1D2340B3001E3F4D /* String.swift */,
 			);
 			name = Extensions;
+			sourceTree = "<group>";
+		};
+		43E6194E1D244344001E3F4D /* Dependencies */ = {
+			isa = PBXGroup;
+			children = (
+				43E6194F1D244344001E3F4D /* birchoutline.js */,
+			);
+			path = Dependencies;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -389,7 +389,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				43E6193B1D232043001E3F4D /* birchoutline.js in Resources */,
+				43E619501D244344001E3F4D /* birchoutline.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -406,7 +406,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				43E6193C1D232043001E3F4D /* birchoutline.js in Resources */,
+				43E619511D244344001E3F4D /* birchoutline.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -432,7 +432,7 @@
 			);
 			name = "Copy birchoutline.js if present and changed";
 			outputPaths = (
-				"$(SRCROOT)/Common/Sources/birchoutline.js",
+				"$(SRCROOT)/Dependencies/birchoutline.js",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

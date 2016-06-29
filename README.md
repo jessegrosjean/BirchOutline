@@ -1,5 +1,7 @@
 # Birch Outline (Swift)
 
+[![Build Status](https://travis-ci.org/jessegrosjean/BirchOutline.svg?branch=master)](https://travis-ci.org/jessegrosjean/BirchOutline)
+
 Birch Outline is a Swift framework (iOS & macOS) that wraps [birch-outline](https://github.com/jessegrosjean/birch-outline).
 
 It's in pre-release now, but I think it's suitable for reading, processing, and seriaizing TaskPaper outlines. In the future the wrapper can be extended to serve as a good runtime outline model for other apps to build off.

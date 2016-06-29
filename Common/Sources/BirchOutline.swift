@@ -8,7 +8,7 @@
 
 public class BirchOutline {
 
-    public static var sharedContext = JavaScriptContext()
+    public static var sharedContext = BirchScriptContext()
 
     public static func createOutline(type: String?, content: String?) -> OutlineType {
         return sharedContext.createOutline(type, content: content)

@@ -15,8 +15,8 @@
 		436C0DDF1D1D64D40089FA7A /* BirchOutline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */; };
 		436C0DE21D1D65090089FA7A /* ItemType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD31D1D64CC0089FA7A /* ItemType.swift */; };
 		436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD31D1D64CC0089FA7A /* ItemType.swift */; };
-		436C0DE41D1D650C0089FA7A /* JavaScriptContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD41D1D64CC0089FA7A /* JavaScriptContext.swift */; };
-		436C0DE51D1D650D0089FA7A /* JavaScriptContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD41D1D64CC0089FA7A /* JavaScriptContext.swift */; };
+		436C0DE41D1D650C0089FA7A /* BirchScriptContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD41D1D64CC0089FA7A /* BirchScriptContext.swift */; };
+		436C0DE51D1D650D0089FA7A /* BirchScriptContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD41D1D64CC0089FA7A /* BirchScriptContext.swift */; };
 		436C0DE61D1D650F0089FA7A /* JSValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD51D1D64CC0089FA7A /* JSValue.swift */; };
 		436C0DE71D1D65100089FA7A /* JSValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD51D1D64CC0089FA7A /* JSValue.swift */; };
 		436C0DEA1D1D65170089FA7A /* OutlineType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DD71D1D64CC0089FA7A /* OutlineType.swift */; };
@@ -67,7 +67,7 @@
 		436C0DC21D1D63630089FA7A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirchOutline.swift; sourceTree = "<group>"; };
 		436C0DD31D1D64CC0089FA7A /* ItemType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemType.swift; sourceTree = "<group>"; };
-		436C0DD41D1D64CC0089FA7A /* JavaScriptContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavaScriptContext.swift; sourceTree = "<group>"; };
+		436C0DD41D1D64CC0089FA7A /* BirchScriptContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BirchScriptContext.swift; sourceTree = "<group>"; };
 		436C0DD51D1D64CC0089FA7A /* JSValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSValue.swift; sourceTree = "<group>"; };
 		436C0DD71D1D64CC0089FA7A /* OutlineType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineType.swift; sourceTree = "<group>"; };
 		436C0DD91D1D64CC0089FA7A /* ItemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemTests.swift; sourceTree = "<group>"; };
@@ -191,7 +191,7 @@
 			isa = PBXGroup;
 			children = (
 				436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */,
-				436C0DD41D1D64CC0089FA7A /* JavaScriptContext.swift */,
+				436C0DD41D1D64CC0089FA7A /* BirchScriptContext.swift */,
 				436C0DFA1D1D65DD0089FA7A /* Outline */,
 				436C0DFB1D1D66380089FA7A /* Extensions */,
 				436C0DF91D1D65A40089FA7A /* Support Files */,
@@ -447,7 +447,7 @@
 			files = (
 				43E6193E1D2340B3001E3F4D /* String.swift in Sources */,
 				436C0DEA1D1D65170089FA7A /* OutlineType.swift in Sources */,
-				436C0DE41D1D650C0089FA7A /* JavaScriptContext.swift in Sources */,
+				436C0DE41D1D650C0089FA7A /* BirchScriptContext.swift in Sources */,
 				436C0DE21D1D65090089FA7A /* ItemType.swift in Sources */,
 				436C0DE61D1D650F0089FA7A /* JSValue.swift in Sources */,
 				436C0DDE1D1D64D30089FA7A /* BirchOutline.swift in Sources */,
@@ -470,7 +470,7 @@
 			files = (
 				43E6193F1D2340B3001E3F4D /* String.swift in Sources */,
 				436C0DEB1D1D65170089FA7A /* OutlineType.swift in Sources */,
-				436C0DE51D1D650D0089FA7A /* JavaScriptContext.swift in Sources */,
+				436C0DE51D1D650D0089FA7A /* BirchScriptContext.swift in Sources */,
 				436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */,
 				436C0DE71D1D65100089FA7A /* JSValue.swift in Sources */,
 				436C0DDF1D1D64D40089FA7A /* BirchOutline.swift in Sources */,

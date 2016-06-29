@@ -15,37 +15,32 @@ import Cocoa
 import JavaScriptCore
 import WebKit
 
-public class JavaScriptContext {
-
-    public static let sharedInstance = JavaScriptContext()
-
-    public var context: JSContext
+public class BirchScriptContext {
     
-    public var jsBirchOutline: JSValue {
-        return context.objectForKeyedSubscript("birchoutline")
-    }
+    public var context: JSContext!    
+    public var jsBirchExports: JSValue!
     
-    public var jsOutlineClass: JSValue {
-        return jsBirchOutline.valueForProperty("Outline")
+    var jsOutlineClass: JSValue {
+        return jsBirchExports.valueForProperty("Outline")
     }
 
-    public var jsItemClass: JSValue {
-        return jsBirchOutline.valueForProperty("Item")
+    var jsItemClass: JSValue {
+        return jsBirchExports.valueForProperty("Item")
     }
 
-    public var jsMutationClass: JSValue {
-        return jsBirchOutline.valueForProperty("Mutation")
+    var jsMutationClass: JSValue {
+        return jsBirchExports.valueForProperty("Mutation")
     }
     
-    public var jsItemSerializerClass: JSValue {
-        return jsBirchOutline.valueForProperty("ItemSerializer")
+    var jsItemSerializerClass: JSValue {
+        return jsBirchExports.valueForProperty("ItemSerializer")
     }
 
-    public var jsDateTimeClass: JSValue {
-        return jsBirchOutline.valueForProperty("DateTime")
+    var jsDateTimeClass: JSValue {
+        return jsBirchExports.valueForProperty("DateTime")
     }
 
-    init () {
+    public init (scriptPath: String? = nil) {
         context = JSContext()
         context.name = "BirchOutlineJavaScriptContext"
         
@@ -53,10 +48,13 @@ public class JavaScriptContext {
         setTimeoutAndClearTimeoutHandlers(context)
         
         let bundle = NSBundle(forClass: self.dynamicType)
-        let scriptPath = bundle.pathForResource("birchoutline", ofType: "js")
-        let script = try! String(contentsOfFile: scriptPath!)
+        let path = scriptPath ?? bundle.pathForResource("birchoutline", ofType: "js")
+        let script = try! String(contentsOfFile: path!)
+        let birchExportsName = path?.lastPathComponent.stringByDeletingPathExtension
         
         context.evaluateScript(script)
+        
+        jsBirchExports = context.objectForKeyedSubscript(birchExportsName)
     }
     
     public func createOutline(type: String?, content: String?) -> OutlineType {

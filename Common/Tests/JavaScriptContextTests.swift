@@ -21,7 +21,7 @@ class JavaScriptContextTests: XCTestCase {
     
     func testInit() {
         XCTAssertNotNil(BirchOutline.sharedContext.context)
-        XCTAssertNotNil(BirchOutline.sharedContext.jsBirchOutline)
+        XCTAssertNotNil(BirchOutline.sharedContext.jsBirchExports)
         XCTAssertNotNil(BirchOutline.sharedContext.jsOutlineClass)
     }
     

@@ -24,8 +24,45 @@ public protocol OutlineType {
 
 }
 
-extension JSValue: OutlineType {
+public enum ChangeKind {
+
+    case Done
+    case Undone
+    case Redone
+    case Cleared
+
+    public init?(string: String) {
+        switch string {
+        case "Done":
+            self = .Done
+        case "Undone":
+            self = .Undone
+        case "Redone":
+            self = .Redone
+        case "Cleared":
+            self = .Cleared
+        default:
+            return nil
+        }
+    }
     
+    public func toString() -> String {
+        switch self {
+        case .Done:
+            return "Done"
+        case .Undone:
+            return "Undone"
+        case .Redone:
+            return "Redone"
+        case .Cleared:
+            return "Cleared"
+        }
+    }
+
+}
+
+extension JSValue: OutlineType {
+
     public var root: ItemType {
         return valueForProperty("root")
     }

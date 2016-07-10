@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		431852681D32A8DE0049BBB0 /* BirchCrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */; };
+		431852691D32AA7F0049BBB0 /* DisposableType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A90C21D2D7C630082CF46 /* DisposableType.swift */; };
+		4318526A1D32ABD80049BBB0 /* BirchCrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */; };
+		436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A90C21D2D7C630082CF46 /* DisposableType.swift */; };
 		436C0D741D1D56D50089FA7A /* BirchOutline.h in Headers */ = {isa = PBXBuildFile; fileRef = 436C0D731D1D56D50089FA7A /* BirchOutline.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		436C0D7B1D1D56D50089FA7A /* BirchOutline.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 436C0D701D1D56D50089FA7A /* BirchOutline.framework */; };
 		436C0DB51D1D63630089FA7A /* BirchOutlineiOS.h in Headers */ = {isa = PBXBuildFile; fileRef = 436C0DB41D1D63630089FA7A /* BirchOutlineiOS.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -55,6 +59,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BirchCrossPlatform.swift; sourceTree = "<group>"; };
+		436A90C21D2D7C630082CF46 /* DisposableType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DisposableType.swift; sourceTree = "<group>"; };
 		436C0D701D1D56D50089FA7A /* BirchOutline.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BirchOutline.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		436C0D731D1D56D50089FA7A /* BirchOutline.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BirchOutline.h; sourceTree = "<group>"; };
 		436C0D751D1D56D50089FA7A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -193,6 +199,7 @@
 			children = (
 				436C0DD01D1D64CC0089FA7A /* BirchOutline.swift */,
 				436C0DD41D1D64CC0089FA7A /* BirchScriptContext.swift */,
+				431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */,
 				436C0DFA1D1D65DD0089FA7A /* Outline */,
 				436C0DFB1D1D66380089FA7A /* Extensions */,
 			);
@@ -224,6 +231,7 @@
 			children = (
 				436C0DD31D1D64CC0089FA7A /* ItemType.swift */,
 				436C0DD71D1D64CC0089FA7A /* OutlineType.swift */,
+				436A90C21D2D7C630082CF46 /* DisposableType.swift */,
 			);
 			name = Outline;
 			sourceTree = "<group>";
@@ -447,8 +455,10 @@
 			files = (
 				43E6193E1D2340B3001E3F4D /* String.swift in Sources */,
 				436C0DEA1D1D65170089FA7A /* OutlineType.swift in Sources */,
+				436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */,
 				436C0DE41D1D650C0089FA7A /* BirchScriptContext.swift in Sources */,
 				436C0DE21D1D65090089FA7A /* ItemType.swift in Sources */,
+				431852681D32A8DE0049BBB0 /* BirchCrossPlatform.swift in Sources */,
 				436C0DE61D1D650F0089FA7A /* JSValue.swift in Sources */,
 				436C0DDE1D1D64D30089FA7A /* BirchOutline.swift in Sources */,
 			);
@@ -469,6 +479,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				43E6193F1D2340B3001E3F4D /* String.swift in Sources */,
+				431852691D32AA7F0049BBB0 /* DisposableType.swift in Sources */,
+				4318526A1D32ABD80049BBB0 /* BirchCrossPlatform.swift in Sources */,
 				436C0DEB1D1D65170089FA7A /* OutlineType.swift in Sources */,
 				436C0DE51D1D650D0089FA7A /* BirchScriptContext.swift in Sources */,
 				436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */,
@@ -544,6 +556,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_SWIFT_FLAGS = "-Xfrontend -debug-time-function-bodies";
 				SDKROOT = macosx;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				VERSIONING_SYSTEM = "apple-generic";

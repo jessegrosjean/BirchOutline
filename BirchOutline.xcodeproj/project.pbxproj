@@ -10,6 +10,8 @@
 		431852681D32A8DE0049BBB0 /* BirchCrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */; };
 		431852691D32AA7F0049BBB0 /* DisposableType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A90C21D2D7C630082CF46 /* DisposableType.swift */; };
 		4318526A1D32ABD80049BBB0 /* BirchCrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */; };
+		4318526C1D32C7C60049BBB0 /* String-Path.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4318526B1D32C7C60049BBB0 /* String-Path.swift */; };
+		4318526D1D32C7C60049BBB0 /* String-Path.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4318526B1D32C7C60049BBB0 /* String-Path.swift */; };
 		436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A90C21D2D7C630082CF46 /* DisposableType.swift */; };
 		436C0D741D1D56D50089FA7A /* BirchOutline.h in Headers */ = {isa = PBXBuildFile; fileRef = 436C0D731D1D56D50089FA7A /* BirchOutline.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		436C0D7B1D1D56D50089FA7A /* BirchOutline.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 436C0D701D1D56D50089FA7A /* BirchOutline.framework */; };
@@ -35,8 +37,8 @@
 		436C0DF51D1D65770089FA7A /* Outline.txt in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDC1D1D64CC0089FA7A /* Outline.txt */; };
 		436C0DF61D1D657B0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
 		436C0DF71D1D657C0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
-		43E6193E1D2340B3001E3F4D /* String.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String.swift */; };
-		43E6193F1D2340B3001E3F4D /* String.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String.swift */; };
+		43E6193E1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
+		43E6193F1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
 		43E619501D244344001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6194F1D244344001E3F4D /* birchoutline.js */; };
 		43E619511D244344001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6194F1D244344001E3F4D /* birchoutline.js */; };
 /* End PBXBuildFile section */
@@ -60,6 +62,7 @@
 
 /* Begin PBXFileReference section */
 		431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BirchCrossPlatform.swift; sourceTree = "<group>"; };
+		4318526B1D32C7C60049BBB0 /* String-Path.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Path.swift"; sourceTree = "<group>"; };
 		436A90C21D2D7C630082CF46 /* DisposableType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DisposableType.swift; sourceTree = "<group>"; };
 		436C0D701D1D56D50089FA7A /* BirchOutline.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BirchOutline.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		436C0D731D1D56D50089FA7A /* BirchOutline.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BirchOutline.h; sourceTree = "<group>"; };
@@ -81,7 +84,7 @@
 		436C0DDB1D1D64CC0089FA7A /* Outline.bml */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.bml; sourceTree = "<group>"; };
 		436C0DDC1D1D64CC0089FA7A /* Outline.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.txt; sourceTree = "<group>"; };
 		436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineTests.swift; sourceTree = "<group>"; };
-		43E6193D1D2340B3001E3F4D /* String.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = String.swift; sourceTree = "<group>"; };
+		43E6193D1D2340B3001E3F4D /* String-Localize.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Localize.swift"; sourceTree = "<group>"; };
 		43E6194F1D244344001E3F4D /* birchoutline.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = birchoutline.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -240,7 +243,8 @@
 			isa = PBXGroup;
 			children = (
 				436C0DD51D1D64CC0089FA7A /* JSValue.swift */,
-				43E6193D1D2340B3001E3F4D /* String.swift */,
+				43E6193D1D2340B3001E3F4D /* String-Localize.swift */,
+				4318526B1D32C7C60049BBB0 /* String-Path.swift */,
 			);
 			name = Extensions;
 			sourceTree = "<group>";
@@ -453,7 +457,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				43E6193E1D2340B3001E3F4D /* String.swift in Sources */,
+				43E6193E1D2340B3001E3F4D /* String-Localize.swift in Sources */,
+				4318526C1D32C7C60049BBB0 /* String-Path.swift in Sources */,
 				436C0DEA1D1D65170089FA7A /* OutlineType.swift in Sources */,
 				436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */,
 				436C0DE41D1D650C0089FA7A /* BirchScriptContext.swift in Sources */,
@@ -478,7 +483,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				43E6193F1D2340B3001E3F4D /* String.swift in Sources */,
+				43E6193F1D2340B3001E3F4D /* String-Localize.swift in Sources */,
+				4318526D1D32C7C60049BBB0 /* String-Path.swift in Sources */,
 				431852691D32AA7F0049BBB0 /* DisposableType.swift in Sources */,
 				4318526A1D32ABD80049BBB0 /* BirchCrossPlatform.swift in Sources */,
 				436C0DEB1D1D65170089FA7A /* OutlineType.swift in Sources */,

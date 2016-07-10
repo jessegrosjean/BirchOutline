@@ -6,12 +6,6 @@
 //  Copyright © 2016 Jesse Grosjean. All rights reserved.
 //
 
-#if os(iOS)
-import UIKit
-#elseif os(OSX)
-import Cocoa
-#endif
-
 import JavaScriptCore
 import WebKit
 
@@ -69,8 +63,8 @@ public class BirchScriptContext {
 
 func setExceptionHandler(context: JSContext) {
     context.exceptionHandler = { context, exception in
-        print("Exception: \(exception)")
-        print("Stack: \(exception.valueForProperty("stack"))")
+        cpAlert("Uncaught JavaScript Exception".localized(), informativeText: "\(exception)\n\n\(exception.valueForProperty("stack"))".localized())
+        exit(EXIT_SUCCESS)
     }
 }
 

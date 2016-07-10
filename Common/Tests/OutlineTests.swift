@@ -28,7 +28,6 @@ class OutlineTests: XCTestCase {
     func testInit() {
         XCTAssertNotNil(outline)
         XCTAssertEqual(outline.root.firstChild!.firstChild!.body, "two")
-        
     }
 
     func testRemoveFromParent() {
@@ -40,10 +39,28 @@ class OutlineTests: XCTestCase {
     }
 
     func testSetTextContent() {
-        outline.reloadSerialization("one\n\ttwo @done\n\tthree", type: nil)
+        outline.reloadSerialization("one\n\ttwo @done\n\tthree", options: nil)
         XCTAssertEqual(outline.root.firstChild!.body, "one")
         XCTAssertEqual(outline.root.lastChild!.body, "one")
         XCTAssertEqual(outline.serialize(nil), "one\n\ttwo @done\n\tthree")
+    }
+
+    func testOnDidUpdateChangeCountDone() {
+        let disposable = outline.onDidUpdateChangeCount { changeType in
+            XCTAssertEqual(changeType, ChangeKind.Done)
+        }
+        outline.root.firstChild!.body = "moose"
+        disposable.dispose()
+    }
+    
+    func testOnDidUpdateChangeCountUndone() {
+        outline.root.firstChild!.body = "moose"
+        let disposable = outline.onDidUpdateChangeCount { changeType in
+            XCTAssertEqual(changeType, ChangeKind.Undone)
+        }
+        outline.undo()
+        disposable.dispose()
+        
     }
 
 }

@@ -10,7 +10,7 @@ import Foundation
 import JavaScriptCore
 
 public protocol OutlineType {
-        
+
     var root: ItemType { get }
     var items: [ItemType] { get }
     
@@ -19,8 +19,15 @@ public protocol OutlineType {
     
     func createItem(text: String) -> ItemType
     
-    func serialize(type: String?) -> String
-    func reloadSerialization(serialization: String, type:String?)
+    var edited: Bool { get }
+    func updateChangeCount(changeKind: ChangeKind)
+    func onDidUpdateChangeCount(callback: (changeKind: ChangeKind) -> Void) -> DisposableType
+
+    func undo()
+    func redo()
+    
+    func serialize(options: [String: AnyObject]?) -> String
+    func reloadSerialization(serialization: String, options: [String: AnyObject]?)
 
 }
 
@@ -83,20 +90,35 @@ extension JSValue: OutlineType {
         return invokeMethod("createItem", withArguments: [text])
     }
 
-    public func serialize(type: String?) -> String {
-        if let type = type {
-            return invokeMethod("serialize", withArguments: [type]).toString()
-        } else {
-            return invokeMethod("serialize", withArguments: []).toString()
+    public var edited: Bool {
+        return valueForProperty("isEdited").toBool()
+    }
+
+    public func updateChangeCount(changeKind: ChangeKind) {
+        invokeMethod("updateChangeCount", withArguments: [changeKind.toString()])
+    }
+
+    public func onDidUpdateChangeCount(callback: (changeKind: ChangeKind) -> Void) -> DisposableType {
+        let callbackWrapper: @convention(block) (changeKindString: String) -> Void = { changeKindString in
+            callback(changeKind: ChangeKind(string: changeKindString)!)
         }
+        return invokeMethod("onDidUpdateChangeCount", withArguments: [unsafeBitCast(callbackWrapper, AnyObject.self)])
     }
     
-    public func reloadSerialization(serialization: String, type:String?) {
-        if let type = type {
-            invokeMethod("reloadSerialization", withArguments: [serialization, type])
-        } else {
-            invokeMethod("reloadSerialization", withArguments: [serialization])
-        }
+    public func undo() {
+        invokeMethod("undo", withArguments: [])
+    }
+    
+    public func redo() {
+        invokeMethod("redo", withArguments: [])
+    }
+
+    public func serialize(options:[String: AnyObject]?) -> String {
+        return invokeMethod("serialize", withArguments: [options ?? [:]]).toString()
+    }
+    
+    public func reloadSerialization(serialization: String, options: [String: AnyObject]?) {
+        invokeMethod("reloadSerialization", withArguments: [serialization, options ?? [:]])
     }
 
 }

@@ -67,7 +67,7 @@ extension JSValue: ItemType {
     }
     
     public var children: [ItemType] {
-        return valueForProperty("children").toArray() as! [ItemType]
+        return valueForProperty("children").toItemTypeArray() 
     }
     
     public func insertChildren(children: [ItemType], beforeSibling: ItemType?) {

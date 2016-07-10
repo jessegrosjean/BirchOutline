@@ -75,7 +75,7 @@ extension JSValue: OutlineType {
     }
     
     public var items: [ItemType] {
-        return valueForProperty("items").toArray() as! [ItemType]
+        return valueForProperty("items").toItemTypeArray()
     }
     
     public func itemForID(id: String) -> ItemType? {
@@ -83,7 +83,7 @@ extension JSValue: OutlineType {
     }
     
     public func evaluateItemPath(path: String) -> [ItemType] {
-        return invokeMethod("evaluateItemPath", withArguments: [path]).toArray() as! [ItemType]
+        return invokeMethod("evaluateItemPath", withArguments: [path]).toItemTypeArray()
     }
 
     public func createItem(text: String) -> ItemType {

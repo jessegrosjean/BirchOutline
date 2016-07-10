@@ -45,6 +45,15 @@ class OutlineTests: XCTestCase {
         XCTAssertEqual(outline.serialize(nil), "one\n\ttwo @done\n\tthree")
     }
 
+    func testItems() {
+        XCTAssertEqual(outline.items[0].body, "one")
+        XCTAssertEqual(outline.items[5].body, "six")
+    }
+
+    func testEvaluateItemPath() {
+        XCTAssertEqual(outline.evaluateItemPath("one")[0].body, "one")
+    }
+
     func testOnDidUpdateChangeCountDone() {
         let disposable = outline.onDidUpdateChangeCount { changeType in
             XCTAssertEqual(changeType, ChangeKind.Done)

@@ -18,4 +18,15 @@ extension JSValue {
         return self
     }
     
+    public func toItemTypeArray() -> [ItemType] {
+        let length = Int(valueForProperty("length").toInt32())
+        var result: [ItemType] = []
+        for i in 0..<length {
+            if let each = valueAtIndex(i) {
+                result.append(each)
+            }
+        }
+        return result
+    }
+    
 }

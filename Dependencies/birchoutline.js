@@ -15178,14 +15178,14 @@ var birchoutline =
 	  };
 	
 	  ItemSerializer.deserializeItems = function(serializedItems, outline, options) {
-	    var each;
+	    var each, serialization;
 	    if (options == null) {
 	      options = {};
 	    }
 	    if (options['type'] == null) {
 	      options['type'] = ItemSerializer.BMLType;
 	    }
-	    return ((function() {
+	    serialization = ((function() {
 	      var i, len, ref, results1;
 	      ref = this.getSerializationsForType(options['type']);
 	      results1 = [];
@@ -15196,7 +15196,8 @@ var birchoutline =
 	        }
 	      }
 	      return results1;
-	    }).call(this))[0].deserializeItems(serializedItems, outline, options);
+	    }).call(this))[0];
+	    return serialization.deserializeItems(serializedItems, outline, options);
 	  };
 	
 	  return ItemSerializer;

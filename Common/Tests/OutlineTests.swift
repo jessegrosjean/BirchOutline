@@ -50,6 +50,12 @@ class OutlineTests: XCTestCase {
         XCTAssertEqual(outline.items[5].body, "six")
     }
 
+    func testCloneItems() {
+        let oneCloned = outline.cloneItems([outline.root.firstChild!], deep: true)[0]
+        XCTAssertEqual(oneCloned.body, "one")
+        XCTAssertEqual(oneCloned.firstChild!.body, "two")
+    }
+
     func testEvaluateItemPath() {
         XCTAssertEqual(outline.evaluateItemPath("one")[0].body, "one")
     }

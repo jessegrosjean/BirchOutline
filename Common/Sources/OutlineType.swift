@@ -10,7 +10,7 @@ import Foundation
 import JavaScriptCore
 
 public protocol OutlineType {
-
+    
     var root: ItemType { get }
     var items: [ItemType] { get }
     
@@ -18,6 +18,8 @@ public protocol OutlineType {
     func evaluateItemPath(path: String) -> [ItemType]
     
     func createItem(text: String) -> ItemType
+    func cloneItem(item: ItemType, deep: Bool) -> ItemType
+    func cloneItems(items: [ItemType], deep: Bool) -> [ItemType]
     
     var edited: Bool { get }
     func updateChangeCount(changeKind: ChangeKind)
@@ -88,6 +90,16 @@ extension JSValue: OutlineType {
 
     public func createItem(text: String) -> ItemType {
         return invokeMethod("createItem", withArguments: [text])
+    }
+    
+    public func cloneItem(item: ItemType, deep: Bool = true) -> ItemType {
+        return invokeMethod("cloneItem", withArguments: [item, deep])
+    }
+    
+    public func cloneItems(items: [ItemType], deep: Bool = true) -> [ItemType] {
+        let jsItems = JSValue.fromItemTypeArray(items, context: context)
+        let jsItemsClone = invokeMethod("cloneItems", withArguments: [jsItems, deep])
+        return jsItemsClone.toItemTypeArray()
     }
 
     public var edited: Bool {

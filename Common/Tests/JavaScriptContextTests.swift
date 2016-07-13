@@ -24,5 +24,5 @@ class JavaScriptContextTests: XCTestCase {
         XCTAssertNotNil(BirchOutline.sharedContext.jsBirchExports)
         XCTAssertNotNil(BirchOutline.sharedContext.jsOutlineClass)
     }
-    
+
 }

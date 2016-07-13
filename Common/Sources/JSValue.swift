@@ -18,6 +18,16 @@ extension JSValue {
         return self
     }
     
+    // must be ...
+    public class func fromItemTypeArray(items: [ItemType], context: JSContext) -> JSValue {
+        let jsItems = JSValue(newArrayInContext: context)
+        for i in 0..<items.count {
+            jsItems.setValue(items[i], atIndex: i)
+        }
+        return jsItems
+    }
+
+    // ... a better way?
     public func toItemTypeArray() -> [ItemType] {
         let length = Int(valueForProperty("length").toInt32())
         var result: [ItemType] = []

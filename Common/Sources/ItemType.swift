@@ -22,6 +22,8 @@ public protocol ItemType: AnyObject {
     var nextSibling: ItemType? { get }
     var children: [ItemType] { get }
 
+    func contains(item: ItemType) -> Bool
+
     func insertChildren(children: [ItemType], beforeSibling: ItemType?)
     func appendChildren(children: [ItemType])
     func removeChildren(children: [ItemType])
@@ -70,6 +72,10 @@ extension JSValue: ItemType {
         return valueForProperty("children").toItemTypeArray() 
     }
     
+    public func contains(item: ItemType) -> Bool {
+        return invokeMethod("contains", withArguments: [item]).toBool()
+    }
+
     public func insertChildren(children: [ItemType], beforeSibling: ItemType?) {
         let mapped: [AnyObject] = children.map { $0 }
         if let beforeSibling = beforeSibling {
@@ -92,7 +98,7 @@ extension JSValue: ItemType {
     public func removeFromParent() {
        invokeMethod("removeFromParent", withArguments: [])
     }
-
+    
     public var attributes: [String:String] {
         return valueForProperty("attributes").toDictionary() as? [String:String] ?? [:]
     }

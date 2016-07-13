@@ -168,6 +168,7 @@ var birchoutline =
 	        return _this.breakUndoCoalescing();
 	      };
 	    })(this)));
+	    Outline.addOutline(this);
 	    this.reloadSerialization(serialization);
 	  }
 	
@@ -178,7 +179,6 @@ var birchoutline =
 	  Outline.prototype.destroy = function() {
 	    var ref1;
 	    if (!this.destroyed) {
-	      Outline.removeOutline(this);
 	      if ((ref1 = this.undoSubscriptions) != null) {
 	        ref1.dispose();
 	      }
@@ -222,8 +222,13 @@ var birchoutline =
 	    if (options == null) {
 	      options = {};
 	    }
+	    assert(!this.getOutlineForID(outline.id));
 	    this.outlines.splice(index, 0, outline);
-	    this.subscribeToOutline(outline);
+	    outline.onDidDestroy((function(_this) {
+	      return function() {
+	        return _this.removeOutline(outline);
+	      };
+	    })(this));
 	    return outline;
 	  };
 	
@@ -242,14 +247,6 @@ var birchoutline =
 	    }
 	    outline = this.outlines.splice(index, 1)[0];
 	    return outline != null ? outline.destroy() : void 0;
-	  };
-	
-	  Outline.subscribeToOutline = function(outline) {
-	    return outline.onDidDestroy((function(_this) {
-	      return function() {
-	        return _this.removeOutline(outline);
-	      };
-	    })(this));
 	  };
 	
 	

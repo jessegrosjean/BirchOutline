@@ -12,6 +12,10 @@
 		4318526A1D32ABD80049BBB0 /* BirchCrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */; };
 		4318526C1D32C7C60049BBB0 /* String-Path.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4318526B1D32C7C60049BBB0 /* String-Path.swift */; };
 		4318526D1D32C7C60049BBB0 /* String-Path.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4318526B1D32C7C60049BBB0 /* String-Path.swift */; };
+		4318528D1D3488B90049BBB0 /* ObjC.h in Headers */ = {isa = PBXBuildFile; fileRef = 4318528B1D3488B90049BBB0 /* ObjC.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4318528E1D3488B90049BBB0 /* ObjC.h in Headers */ = {isa = PBXBuildFile; fileRef = 4318528B1D3488B90049BBB0 /* ObjC.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4318528F1D3488B90049BBB0 /* ObjC.m in Sources */ = {isa = PBXBuildFile; fileRef = 4318528C1D3488B90049BBB0 /* ObjC.m */; };
+		431852901D3488B90049BBB0 /* ObjC.m in Sources */ = {isa = PBXBuildFile; fileRef = 4318528C1D3488B90049BBB0 /* ObjC.m */; };
 		436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A90C21D2D7C630082CF46 /* DisposableType.swift */; };
 		436C0D741D1D56D50089FA7A /* BirchOutline.h in Headers */ = {isa = PBXBuildFile; fileRef = 436C0D731D1D56D50089FA7A /* BirchOutline.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		436C0D7B1D1D56D50089FA7A /* BirchOutline.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 436C0D701D1D56D50089FA7A /* BirchOutline.framework */; };
@@ -63,6 +67,8 @@
 /* Begin PBXFileReference section */
 		431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BirchCrossPlatform.swift; sourceTree = "<group>"; };
 		4318526B1D32C7C60049BBB0 /* String-Path.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Path.swift"; sourceTree = "<group>"; };
+		4318528B1D3488B90049BBB0 /* ObjC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjC.h; sourceTree = "<group>"; };
+		4318528C1D3488B90049BBB0 /* ObjC.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ObjC.m; sourceTree = "<group>"; };
 		436A90C21D2D7C630082CF46 /* DisposableType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DisposableType.swift; sourceTree = "<group>"; };
 		436C0D701D1D56D50089FA7A /* BirchOutline.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BirchOutline.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		436C0D731D1D56D50089FA7A /* BirchOutline.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BirchOutline.h; sourceTree = "<group>"; };
@@ -245,6 +251,8 @@
 				436C0DD51D1D64CC0089FA7A /* JSValue.swift */,
 				43E6193D1D2340B3001E3F4D /* String-Localize.swift */,
 				4318526B1D32C7C60049BBB0 /* String-Path.swift */,
+				4318528B1D3488B90049BBB0 /* ObjC.h */,
+				4318528C1D3488B90049BBB0 /* ObjC.m */,
 			);
 			name = Extensions;
 			sourceTree = "<group>";
@@ -264,6 +272,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4318528D1D3488B90049BBB0 /* ObjC.h in Headers */,
 				436C0D741D1D56D50089FA7A /* BirchOutline.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -272,6 +281,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4318528E1D3488B90049BBB0 /* ObjC.h in Headers */,
 				436C0DB51D1D63630089FA7A /* BirchOutlineiOS.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -462,6 +472,7 @@
 				436C0DEA1D1D65170089FA7A /* OutlineType.swift in Sources */,
 				436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */,
 				436C0DE41D1D650C0089FA7A /* BirchScriptContext.swift in Sources */,
+				4318528F1D3488B90049BBB0 /* ObjC.m in Sources */,
 				436C0DE21D1D65090089FA7A /* ItemType.swift in Sources */,
 				431852681D32A8DE0049BBB0 /* BirchCrossPlatform.swift in Sources */,
 				436C0DE61D1D650F0089FA7A /* JSValue.swift in Sources */,
@@ -488,6 +499,7 @@
 				431852691D32AA7F0049BBB0 /* DisposableType.swift in Sources */,
 				4318526A1D32ABD80049BBB0 /* BirchCrossPlatform.swift in Sources */,
 				436C0DEB1D1D65170089FA7A /* OutlineType.swift in Sources */,
+				431852901D3488B90049BBB0 /* ObjC.m in Sources */,
 				436C0DE51D1D650D0089FA7A /* BirchScriptContext.swift in Sources */,
 				436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */,
 				436C0DE71D1D65100089FA7A /* JSValue.swift in Sources */,
@@ -677,6 +689,7 @@
 		436C0DC41D1D63630089FA7A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -697,6 +710,7 @@
 		436C0DC51D1D63630089FA7A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;

@@ -16,6 +16,10 @@
 		4318528E1D3488B90049BBB0 /* ObjC.h in Headers */ = {isa = PBXBuildFile; fileRef = 4318528B1D3488B90049BBB0 /* ObjC.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4318528F1D3488B90049BBB0 /* ObjC.m in Sources */ = {isa = PBXBuildFile; fileRef = 4318528C1D3488B90049BBB0 /* ObjC.m */; };
 		431852901D3488B90049BBB0 /* ObjC.m in Sources */ = {isa = PBXBuildFile; fileRef = 4318528C1D3488B90049BBB0 /* ObjC.m */; };
+		435A3C011D38292F00E05ED5 /* OutlineFixture.bml in Resources */ = {isa = PBXBuildFile; fileRef = 435A3BFF1D38292F00E05ED5 /* OutlineFixture.bml */; };
+		435A3C021D38292F00E05ED5 /* OutlineFixture.bml in Resources */ = {isa = PBXBuildFile; fileRef = 435A3BFF1D38292F00E05ED5 /* OutlineFixture.bml */; };
+		435A3C031D38292F00E05ED5 /* OutlineFixture.txt in Resources */ = {isa = PBXBuildFile; fileRef = 435A3C001D38292F00E05ED5 /* OutlineFixture.txt */; };
+		435A3C041D38292F00E05ED5 /* OutlineFixture.txt in Resources */ = {isa = PBXBuildFile; fileRef = 435A3C001D38292F00E05ED5 /* OutlineFixture.txt */; };
 		436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A90C21D2D7C630082CF46 /* DisposableType.swift */; };
 		436C0D741D1D56D50089FA7A /* BirchOutline.h in Headers */ = {isa = PBXBuildFile; fileRef = 436C0D731D1D56D50089FA7A /* BirchOutline.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		436C0D7B1D1D56D50089FA7A /* BirchOutline.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 436C0D701D1D56D50089FA7A /* BirchOutline.framework */; };
@@ -37,10 +41,6 @@
 		436C0DEF1D1D65210089FA7A /* JavaScriptContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDA1D1D64CC0089FA7A /* JavaScriptContextTests.swift */; };
 		436C0DF01D1D65230089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
 		436C0DF11D1D65240089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
-		436C0DF41D1D65770089FA7A /* Outline.txt in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDC1D1D64CC0089FA7A /* Outline.txt */; };
-		436C0DF51D1D65770089FA7A /* Outline.txt in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDC1D1D64CC0089FA7A /* Outline.txt */; };
-		436C0DF61D1D657B0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
-		436C0DF71D1D657C0089FA7A /* Outline.bml in Resources */ = {isa = PBXBuildFile; fileRef = 436C0DDB1D1D64CC0089FA7A /* Outline.bml */; };
 		43E6193E1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
 		43E6193F1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
 		43E619501D244344001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6194F1D244344001E3F4D /* birchoutline.js */; };
@@ -69,6 +69,8 @@
 		4318526B1D32C7C60049BBB0 /* String-Path.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Path.swift"; sourceTree = "<group>"; };
 		4318528B1D3488B90049BBB0 /* ObjC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjC.h; sourceTree = "<group>"; };
 		4318528C1D3488B90049BBB0 /* ObjC.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ObjC.m; sourceTree = "<group>"; };
+		435A3BFF1D38292F00E05ED5 /* OutlineFixture.bml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = OutlineFixture.bml; sourceTree = "<group>"; };
+		435A3C001D38292F00E05ED5 /* OutlineFixture.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = OutlineFixture.txt; sourceTree = "<group>"; };
 		436A90C21D2D7C630082CF46 /* DisposableType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DisposableType.swift; sourceTree = "<group>"; };
 		436C0D701D1D56D50089FA7A /* BirchOutline.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BirchOutline.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		436C0D731D1D56D50089FA7A /* BirchOutline.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BirchOutline.h; sourceTree = "<group>"; };
@@ -87,8 +89,6 @@
 		436C0DD71D1D64CC0089FA7A /* OutlineType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineType.swift; sourceTree = "<group>"; };
 		436C0DD91D1D64CC0089FA7A /* ItemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemTests.swift; sourceTree = "<group>"; };
 		436C0DDA1D1D64CC0089FA7A /* JavaScriptContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavaScriptContextTests.swift; sourceTree = "<group>"; };
-		436C0DDB1D1D64CC0089FA7A /* Outline.bml */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.bml; sourceTree = "<group>"; };
-		436C0DDC1D1D64CC0089FA7A /* Outline.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Outline.txt; sourceTree = "<group>"; };
 		436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineTests.swift; sourceTree = "<group>"; };
 		43E6193D1D2340B3001E3F4D /* String-Localize.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Localize.swift"; sourceTree = "<group>"; };
 		43E6194F1D244344001E3F4D /* birchoutline.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = birchoutline.js; sourceTree = "<group>"; };
@@ -128,6 +128,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		435A3C051D38295800E05ED5 /* Shared Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				435A3BFF1D38292F00E05ED5 /* OutlineFixture.bml */,
+				435A3C001D38292F00E05ED5 /* OutlineFixture.txt */,
+			);
+			name = "Shared Fixtures";
+			sourceTree = "<group>";
+		};
 		436C0D661D1D56D50089FA7A = {
 			isa = PBXGroup;
 			children = (
@@ -171,6 +180,7 @@
 		436C0DAB1D1D60B00089FA7A /* Support Files */ = {
 			isa = PBXGroup;
 			children = (
+				435A3C051D38295800E05ED5 /* Shared Fixtures */,
 				436C0D731D1D56D50089FA7A /* BirchOutline.h */,
 				436C0D751D1D56D50089FA7A /* Info.plist */,
 			);
@@ -229,8 +239,6 @@
 		436C0DF81D1D65850089FA7A /* Fixtures */ = {
 			isa = PBXGroup;
 			children = (
-				436C0DDB1D1D64CC0089FA7A /* Outline.bml */,
-				436C0DDC1D1D64CC0089FA7A /* Outline.txt */,
 			);
 			name = Fixtures;
 			sourceTree = "<group>";
@@ -411,6 +419,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				435A3C031D38292F00E05ED5 /* OutlineFixture.txt in Resources */,
+				435A3C011D38292F00E05ED5 /* OutlineFixture.bml in Resources */,
 				43E619501D244344001E3F4D /* birchoutline.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -419,8 +429,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				436C0DF71D1D657C0089FA7A /* Outline.bml in Resources */,
-				436C0DF51D1D65770089FA7A /* Outline.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -428,6 +436,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				435A3C041D38292F00E05ED5 /* OutlineFixture.txt in Resources */,
+				435A3C021D38292F00E05ED5 /* OutlineFixture.bml in Resources */,
 				43E619511D244344001E3F4D /* birchoutline.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -436,8 +446,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				436C0DF61D1D657B0089FA7A /* Outline.bml in Resources */,
-				436C0DF41D1D65770089FA7A /* Outline.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

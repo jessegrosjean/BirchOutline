@@ -15301,13 +15301,15 @@ var birchoutline =
 	    expanded: expandedItemIDs
 	  };
 	  sourceOutline = Outline.getOutlineForID(json.outlineID);
-	  ref = json.items;
-	  for (i = 0, len = ref.length; i < len; i++) {
-	    each = ref[i];
-	    if (item = sourceOutline.getItemForID(each.id)) {
-	      items.push(item);
-	      if (each.expanded) {
-	        expandedItemIDs.push(each.id);
+	  if (sourceOutline) {
+	    ref = json.items;
+	    for (i = 0, len = ref.length; i < len; i++) {
+	      each = ref[i];
+	      if (item = sourceOutline.getItemForID(each.id)) {
+	        items.push(item);
+	        if (each.expanded) {
+	          expandedItemIDs.push(each.id);
+	        }
 	      }
 	    }
 	  }

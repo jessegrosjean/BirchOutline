@@ -16,7 +16,7 @@ class OutlineTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        let path = NSBundle(forClass: self.dynamicType).pathForResource("Outline", ofType: "txt")!
+        let path = NSBundle(forClass: BirchScriptContext.self).pathForResource("OutlineFixture", ofType: "txt")!
         let textContents = try! NSString(contentsOfFile: path, encoding: NSUTF8StringEncoding)
         outline = BirchOutline.createTaskPaperOutline(textContents as String)
     }

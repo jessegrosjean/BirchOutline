@@ -21,7 +21,7 @@ public protocol OutlineType {
     func cloneItem(item: ItemType, deep: Bool) -> ItemType
     func cloneItems(items: [ItemType], deep: Bool) -> [ItemType]
     
-    var edited: Bool { get }
+    var changed: Bool { get }
     func updateChangeCount(changeKind: ChangeKind)
     func onDidUpdateChangeCount(callback: (changeKind: ChangeKind) -> Void) -> DisposableType
 
@@ -31,6 +31,7 @@ public protocol OutlineType {
     func serialize(options: [String: AnyObject]?) -> String
     func reloadSerialization(serialization: String, options: [String: AnyObject]?)
 
+    var retainCount: Int { get }
 }
 
 public enum ChangeKind {
@@ -70,67 +71,77 @@ public enum ChangeKind {
 
 }
 
-extension JSValue: OutlineType {
+public class Outline: OutlineType {
+    
+    public var jsOutline: JSValue
+    
+    init(jsOutline: JSValue) {
+        self.jsOutline = jsOutline
+    }
 
     public var root: ItemType {
-        return valueForProperty("root")
+        return jsOutline.valueForProperty("root")
     }
     
     public var items: [ItemType] {
-        return valueForProperty("items").toItemTypeArray()
+        return jsOutline.valueForProperty("items").toItemTypeArray()
     }
     
     public func itemForID(id: String) -> ItemType? {
-        return invokeMethod("getItemForID", withArguments: [id]).selfOrNil()
+        return jsOutline.invokeMethod("getItemForID", withArguments: [id]).selfOrNil()
     }
     
     public func evaluateItemPath(path: String) -> [ItemType] {
-        return invokeMethod("evaluateItemPath", withArguments: [path]).toItemTypeArray()
+        return jsOutline.invokeMethod("evaluateItemPath", withArguments: [path]).toItemTypeArray()
     }
-
+    
     public func createItem(text: String) -> ItemType {
-        return invokeMethod("createItem", withArguments: [text])
+        return jsOutline.invokeMethod("createItem", withArguments: [text])
     }
     
     public func cloneItem(item: ItemType, deep: Bool = true) -> ItemType {
-        return invokeMethod("cloneItem", withArguments: [item, deep])
+        return jsOutline.invokeMethod("cloneItem", withArguments: [item, deep])
     }
     
     public func cloneItems(items: [ItemType], deep: Bool = true) -> [ItemType] {
-        let jsItems = JSValue.fromItemTypeArray(items, context: context)
-        let jsItemsClone = invokeMethod("cloneItems", withArguments: [jsItems, deep])
+        let jsItems = JSValue.fromItemTypeArray(items, context: jsOutline.context)
+        let jsItemsClone = jsOutline.invokeMethod("cloneItems", withArguments: [jsItems, deep])
         return jsItemsClone.toItemTypeArray()
     }
-
-    public var edited: Bool {
-        return valueForProperty("isEdited").toBool()
+    
+    public var changed: Bool {
+        return jsOutline.valueForProperty("isChanged").toBool()
     }
-
+    
     public func updateChangeCount(changeKind: ChangeKind) {
-        invokeMethod("updateChangeCount", withArguments: [changeKind.toString()])
+        jsOutline.invokeMethod("updateChangeCount", withArguments: [changeKind.toString()])
     }
-
+    
     public func onDidUpdateChangeCount(callback: (changeKind: ChangeKind) -> Void) -> DisposableType {
         let callbackWrapper: @convention(block) (changeKindString: String) -> Void = { changeKindString in
             callback(changeKind: ChangeKind(string: changeKindString)!)
         }
-        return invokeMethod("onDidUpdateChangeCount", withArguments: [unsafeBitCast(callbackWrapper, AnyObject.self)])
+        return jsOutline.invokeMethod("onDidUpdateChangeCount", withArguments: [unsafeBitCast(callbackWrapper, AnyObject.self)])
     }
     
     public func undo() {
-        invokeMethod("undo", withArguments: [])
+        jsOutline.invokeMethod("undo", withArguments: [])
     }
     
     public func redo() {
-        invokeMethod("redo", withArguments: [])
+        jsOutline.invokeMethod("redo", withArguments: [])
     }
-
+    
     public func serialize(options:[String: AnyObject]?) -> String {
-        return invokeMethod("serialize", withArguments: [options ?? [:]]).toString()
+        return jsOutline.invokeMethod("serialize", withArguments: [options ?? [:]]).toString()
     }
     
     public func reloadSerialization(serialization: String, options: [String: AnyObject]?) {
-        invokeMethod("reloadSerialization", withArguments: [serialization, options ?? [:]])
+        jsOutline.invokeMethod("reloadSerialization", withArguments: [serialization, options ?? [:]])
     }
-
+    
+    public var retainCount: Int {
+        return Int(jsOutline.valueForProperty("retainCount").toInt32())
+    }
+    
 }

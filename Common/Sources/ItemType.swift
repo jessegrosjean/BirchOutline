@@ -13,7 +13,6 @@ import JavaScriptCore
 public protocol ItemType: AnyObject {
     
     var id: String { get }
-    var outline: OutlineType { get }
     
     var parent: ItemType? { get }
     var firstChild: ItemType? { get }
@@ -42,10 +41,6 @@ extension JSValue: ItemType {
 
     public var id: String {
         return valueForProperty("id").toString()
-    }
-
-    public var outline: OutlineType {
-        return valueForProperty("outline")
     }
 
     public var parent: ItemType? {

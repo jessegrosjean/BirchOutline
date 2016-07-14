@@ -52,11 +52,11 @@ public class BirchScriptContext {
     }
     
     public func createOutline(type: String?, content: String?) -> OutlineType {
-        return jsOutlineClass.constructWithArguments([type ?? "text/plain", content ?? ""])
+        return Outline(jsOutline: jsOutlineClass.constructWithArguments([type ?? "text/plain", content ?? ""]))
     }
     
     public func createTaskPaperOutline(content: String?) -> OutlineType {
-        return jsOutlineClass.constructWithArguments(["text/taskpaper", content ?? ""])
+        return Outline(jsOutline: jsOutlineClass.constructWithArguments(["text/taskpaper", content ?? ""]))
     }
     
 }

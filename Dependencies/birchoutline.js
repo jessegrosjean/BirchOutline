@@ -104,7 +104,7 @@ var birchoutline =
 	
 	  Outline.prototype.idsToItems = null;
 	
-	  Outline.prototype.refcount = 0;
+	  Outline.prototype.retainCount = 0;
 	
 	  Outline.prototype.changes = null;
 	
@@ -168,7 +168,6 @@ var birchoutline =
 	        return _this.breakUndoCoalescing();
 	      };
 	    })(this)));
-	    Outline.addOutline(this);
 	    this.reloadSerialization(serialization);
 	  }
 	
@@ -211,17 +210,11 @@ var birchoutline =
 	    }
 	  };
 	
-	  Outline.addOutline = function(outline, options) {
-	    if (options == null) {
-	      options = {};
-	    }
-	    return this.addOutlineAtIndex(outline, this.outlines.length, options);
+	  Outline.addOutline = function(outline) {
+	    return this.addOutlineAtIndex(outline, this.outlines.length);
 	  };
 	
-	  Outline.addOutlineAtIndex = function(outline, index, options) {
-	    if (options == null) {
-	      options = {};
-	    }
+	  Outline.addOutlineAtIndex = function(outline, index) {
 	    assert(!this.getOutlineForID(outline.id));
 	    this.outlines.splice(index, 0, outline);
 	    outline.onDidDestroy((function(_this) {
@@ -240,13 +233,36 @@ var birchoutline =
 	    }
 	  };
 	
-	  Outline.removeOutlineAtIndex = function(index, options) {
+	  Outline.removeOutlineAtIndex = function(index) {
 	    var outline;
-	    if (options == null) {
-	      options = {};
-	    }
 	    outline = this.outlines.splice(index, 1)[0];
 	    return outline != null ? outline.destroy() : void 0;
+	  };
+	
+	
+	  /*
+	  Section: Lifecycle
+	   */
+	
+	  Outline.prototype.isRetained = function() {
+	    return this.retainCount > 0;
+	  };
+	
+	  Outline.prototype.retain = function() {
+	    assert(!this.destroyed, 'Cant retain destroyed outline');
+	    if (this.retainCount === 0) {
+	      Outline.addOutline(this);
+	    }
+	    this.retainCount++;
+	    return this;
+	  };
+	
+	  Outline.prototype.release = function() {
+	    this.retainCount--;
+	    if (!this.isRetained()) {
+	      this.destroy();
+	    }
+	    return this;
 	  };
 	
 	
@@ -584,6 +600,27 @@ var birchoutline =
 	  Section: Changes
 	   */
 	
+	  Outline.prototype.isChanged = function() {
+	    return this.changeCount !== 0;
+	  };
+	
+	  Outline.prototype.updateChangeCount = function(changeType) {
+	    switch (changeType) {
+	      case Outline.ChangeDone:
+	        this.changeCount++;
+	        break;
+	      case Outline.ChangeUndone:
+	        this.changeCount--;
+	        break;
+	      case Outline.ChangeCleared:
+	        this.changeCount = 0;
+	        break;
+	      case Outline.ChangeRedone:
+	        this.changeCount++;
+	    }
+	    return this.emitter.emit('did-update-change-count', changeType);
+	  };
+	
 	  Outline.prototype.isChanging = null;
 	
 	  Object.defineProperty(Outline.prototype, 'isChanging', {
@@ -672,9 +709,10 @@ var birchoutline =
 	    }
 	  };
 	
-	  Outline.prototype.breakUndoCoalescing = function() {
-	    return this.coalescingMutation = null;
-	  };
+	
+	  /*
+	  Section: Undo
+	   */
 	
 	  Outline.prototype.groupUndo = function(callback) {
 	    this.beginUndoGrouping();
@@ -696,6 +734,10 @@ var birchoutline =
 	
 	  Outline.prototype.endUndoGrouping = function() {
 	    return this.undoManager.endUndoGrouping();
+	  };
+	
+	  Outline.prototype.breakUndoCoalescing = function() {
+	    return this.coalescingMutation = null;
 	  };
 	
 	  Outline.prototype.undo = function() {
@@ -771,54 +813,6 @@ var birchoutline =
 	        candidateID = null;
 	      }
 	    }
-	  };
-	
-	  Outline.prototype.isDestroyed = function() {
-	    return this.destroyed;
-	  };
-	
-	  Outline.prototype.isRetained = function() {
-	    return this.refcount > 0;
-	  };
-	
-	  Outline.prototype.isEdited = function() {
-	    return this.changeCount !== 0;
-	  };
-	
-	  Outline.prototype.updateChangeCount = function(changeType) {
-	    switch (changeType) {
-	      case Outline.ChangeDone:
-	        this.changeCount++;
-	        break;
-	      case Outline.ChangeUndone:
-	        this.changeCount--;
-	        break;
-	      case Outline.ChangeCleared:
-	        this.changeCount = 0;
-	        break;
-	      case Outline.ChangeRedone:
-	        this.changeCount++;
-	    }
-	    return this.emitter.emit('did-update-change-count', changeType);
-	  };
-	
-	  Outline.prototype.retain = function() {
-	    this.refcount++;
-	    return this;
-	  };
-	
-	  Outline.prototype.release = function(editorID) {
-	    var each, i, len, ref1;
-	    this.refcount--;
-	    ref1 = this.items;
-	    for (i = 0, len = ref1.length; i < len; i++) {
-	      each = ref1[i];
-	      each.setUserData(editorID, void 0);
-	    }
-	    if (!this.isRetained()) {
-	      this.destroy();
-	    }
-	    return this;
 	  };
 	
 	  return Outline;
@@ -15298,23 +15292,22 @@ var birchoutline =
 	 */
 	
 	deserializeItems = function(json, outline, options) {
-	  var each, expandedItemIDs, i, item, items, len, ref, sourceOutline;
+	  var Outline, each, expandedItemIDs, i, item, items, len, ref, sourceOutline;
+	  Outline = __webpack_require__(2);
 	  json = JSON.parse(json);
-	  sourceOutline = __webpack_require__(2).getOutlineForID(json.outlineID);
 	  items = [];
 	  expandedItemIDs = [];
 	  items.loadOptions = {
 	    expanded: expandedItemIDs
 	  };
-	  if (sourceOutline) {
-	    ref = json.items;
-	    for (i = 0, len = ref.length; i < len; i++) {
-	      each = ref[i];
-	      if (item = sourceOutline.getItemForID(each.id)) {
-	        items.push(item);
-	        if (each.expanded) {
-	          expandedItemIDs.push(each.id);
-	        }
+	  sourceOutline = Outline.getOutlineForID(json.outlineID);
+	  ref = json.items;
+	  for (i = 0, len = ref.length; i < len; i++) {
+	    each = ref[i];
+	    if (item = sourceOutline.getItemForID(each.id)) {
+	      items.push(item);
+	      if (each.expanded) {
+	        expandedItemIDs.push(each.id);
 	      }
 	    }
 	  }
@@ -16097,29 +16090,6 @@ var birchoutline =
 	      return object.toString();
 	    } else {
 	      return object;
-	    }
-	  };
-	
-	
-	  /*
-	  Section: User Data
-	   */
-	
-	  Item.prototype.userData = null;
-	
-	  Item.prototype.getUserData = function(userKey) {
-	    var ref;
-	    return (ref = this.userData) != null ? ref[userKey] : void 0;
-	  };
-	
-	  Item.prototype.setUserData = function(userKey, userData) {
-	    if (!this.userData) {
-	      this.userData = {};
-	    }
-	    if (userData === void 0) {
-	      return delete this.userData[userKey];
-	    } else {
-	      return this.userData[userKey] = userData;
 	    }
 	  };
 	

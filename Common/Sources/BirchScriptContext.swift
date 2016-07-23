@@ -34,6 +34,10 @@ public class BirchScriptContext {
         return jsBirchExports.valueForProperty("DateTime")
     }
 
+    var jsItemPathClass: JSValue {
+        return jsBirchExports.valueForProperty("ItemPath")
+    }
+
     public init (scriptPath: String? = nil) {
         context = JSContext()
         context.name = "BirchOutlineJavaScriptContext"

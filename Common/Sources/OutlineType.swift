@@ -24,7 +24,8 @@ public protocol OutlineType {
     var changed: Bool { get }
     func updateChangeCount(changeKind: ChangeKind)
     func onDidUpdateChangeCount(callback: (changeKind: ChangeKind) -> Void) -> DisposableType
-
+    func onDidChange(callback: (mutation: MutationType) -> Void) -> DisposableType
+    
     func undo()
     func redo()
     
@@ -108,7 +109,7 @@ public class Outline: OutlineType {
         let jsItemsClone = jsOutline.invokeMethod("cloneItems", withArguments: [jsItems, deep])
         return jsItemsClone.toItemTypeArray()
     }
-    
+
     public var changed: Bool {
         return jsOutline.valueForProperty("isChanged").toBool()
     }
@@ -122,6 +123,13 @@ public class Outline: OutlineType {
             callback(changeKind: ChangeKind(string: changeKindString)!)
         }
         return jsOutline.invokeMethod("onDidUpdateChangeCount", withArguments: [unsafeBitCast(callbackWrapper, AnyObject.self)])
+    }
+    
+    public func onDidChange(callback: (mutation: MutationType) -> Void) -> DisposableType {
+        let callbackWrapper: @convention(block) (mutation: JSValue) -> Void = { mutation in
+            callback(mutation: Mutation(jsMutation: mutation))
+        }
+        return jsOutline.invokeMethod("onDidChange", withArguments: [unsafeBitCast(callbackWrapper, AnyObject.self)])
     }
     
     public func undo() {

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4300222B1D4435AA00E7908D /* MutationType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4300222A1D4435AA00E7908D /* MutationType.swift */; };
+		4300222D1D452DA500E7908D /* ItemPathQueryType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4300222C1D452DA500E7908D /* ItemPathQueryType.swift */; };
 		431852681D32A8DE0049BBB0 /* BirchCrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */; };
 		431852691D32AA7F0049BBB0 /* DisposableType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436A90C21D2D7C630082CF46 /* DisposableType.swift */; };
 		4318526A1D32ABD80049BBB0 /* BirchCrossPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */; };
@@ -67,6 +68,7 @@
 
 /* Begin PBXFileReference section */
 		4300222A1D4435AA00E7908D /* MutationType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MutationType.swift; sourceTree = "<group>"; };
+		4300222C1D452DA500E7908D /* ItemPathQueryType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ItemPathQueryType.swift; sourceTree = "<group>"; };
 		431852671D32A8DE0049BBB0 /* BirchCrossPlatform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BirchCrossPlatform.swift; sourceTree = "<group>"; };
 		4318526B1D32C7C60049BBB0 /* String-Path.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Path.swift"; sourceTree = "<group>"; };
 		4318528B1D3488B90049BBB0 /* ObjC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjC.h; sourceTree = "<group>"; };
@@ -252,6 +254,7 @@
 				436C0DD71D1D64CC0089FA7A /* OutlineType.swift */,
 				4300222A1D4435AA00E7908D /* MutationType.swift */,
 				436A90C21D2D7C630082CF46 /* DisposableType.swift */,
+				4300222C1D452DA500E7908D /* ItemPathQueryType.swift */,
 			);
 			name = Outline;
 			sourceTree = "<group>";
@@ -480,6 +483,7 @@
 			files = (
 				43E6193E1D2340B3001E3F4D /* String-Localize.swift in Sources */,
 				4318526C1D32C7C60049BBB0 /* String-Path.swift in Sources */,
+				4300222D1D452DA500E7908D /* ItemPathQueryType.swift in Sources */,
 				436C0DEA1D1D65170089FA7A /* OutlineType.swift in Sources */,
 				436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */,
 				436C0DE41D1D650C0089FA7A /* BirchScriptContext.swift in Sources */,

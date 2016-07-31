@@ -54,6 +54,7 @@ var birchoutline =
 	  ItemPath: __webpack_require__(181),
 	  DateTime: __webpack_require__(76),
 	  AttributedString: __webpack_require__(7),
+	  ItemPathQuery: __webpack_require__(198),
 	  SpanBuffer: __webpack_require__(9),
 	  Span: __webpack_require__(13),
 	  shortid: __webpack_require__(193),
@@ -343,14 +344,17 @@ var birchoutline =
 	    return items;
 	  };
 	
-	  Outline.prototype.getAttributeNames = function(autoIncludeNames) {
+	  Outline.prototype.getAttributeNames = function(autoIncludeAttributes, excludeAttributes) {
 	    var attributes, attributesArray, each, eachAttributeName, i, j, k, len, len1, len2, ref1, ref2;
-	    if (autoIncludeNames == null) {
-	      autoIncludeNames = [];
+	    if (autoIncludeAttributes == null) {
+	      autoIncludeAttributes = [];
+	    }
+	    if (excludeAttributes == null) {
+	      excludeAttributes = [];
 	    }
 	    attributes = new Set();
-	    for (i = 0, len = autoIncludeNames.length; i < len; i++) {
-	      each = autoIncludeNames[i];
+	    for (i = 0, len = autoIncludeAttributes.length; i < len; i++) {
+	      each = autoIncludeAttributes[i];
 	      attributes.add(each);
 	    }
 	    ref1 = this.root.descendants;
@@ -359,7 +363,9 @@ var birchoutline =
 	      ref2 = Object.keys(each.attributes);
 	      for (k = 0, len2 = ref2.length; k < len2; k++) {
 	        eachAttributeName = ref2[k];
-	        attributes.add(eachAttributeName);
+	        if (excludeAttributes.indexOf(eachAttributeName) === -1) {
+	          attributes.add(eachAttributeName);
+	        }
 	      }
 	    }
 	    attributesArray = [];
@@ -370,12 +376,27 @@ var birchoutline =
 	    return attributesArray;
 	  };
 	
+	  Outline.prototype.getTagAttributeNames = function(autoIncludeAttributes, excludeAttributes) {
+	    if (autoIncludeAttributes == null) {
+	      autoIncludeAttributes = [];
+	    }
+	    if (excludeAttributes == null) {
+	      excludeAttributes = [];
+	    }
+	    return this.getAttributeNames(autoIncludeAttributes, excludeAttributes).filter(function(each) {
+	      return each.substring(0, 5) === 'data-';
+	    });
+	  };
+	
 	  Outline.prototype.evaluateItemPath = function(itemPath, contextItem, options) {
 	    if (options == null) {
 	      options = {};
 	    }
 	    if (options.root == null) {
 	      options.root = this.root;
+	    }
+	    if (options.types == null) {
+	      options.types = ItemSerializer.getSerializationsForType(this.type)[0].itemPathTypes;
 	    }
 	    if (contextItem == null) {
 	      contextItem = this.root;
@@ -32835,15 +32856,13 @@ var birchoutline =
 	_ = __webpack_require__(14);
 	
 	module.exports = ItemPath = (function() {
-	  ItemPath.defaultTypes = {};
-	
 	  ItemPath.parse = function(path, startRule, types) {
 	    var e, error1, exception, keywords, parsedPath;
 	    if (startRule == null) {
 	      startRule = 'ItemPathExpression';
 	    }
 	    if (types == null) {
-	      types = this.defaultTypes;
+	      types = {};
 	    }
 	    exception = null;
 	    keywords = [];
@@ -32882,13 +32901,13 @@ var birchoutline =
 	  };
 	
 	  function ItemPath(pathExpressionString, options1) {
-	    var parsed, ref;
+	    var parsed;
 	    this.pathExpressionString = pathExpressionString;
 	    this.options = options1;
 	    if (this.options == null) {
 	      this.options = {};
 	    }
-	    parsed = this.constructor.parse(this.pathExpressionString, void 0, (ref = this.options.types) != null ? ref : ItemPath.defaultTypes);
+	    parsed = this.constructor.parse(this.pathExpressionString, void 0, this.options.types);
 	    this.pathExpressionAST = parsed.parsedPath;
 	    this.pathExpressionKeywords = parsed.keywords;
 	    this.pathExpressionError = parsed.error;
@@ -37509,7 +37528,12 @@ var birchoutline =
 	  endSerializeItem: text.endSerializeItem,
 	  endSerialization: text.endSerialization,
 	  emptyEncodeLastItem: text.emptyEncodeLastItem,
-	  deserializeItems: deserializeItems
+	  deserializeItems: deserializeItems,
+	  itemPathTypes: {
+	    'project': true,
+	    'task': true,
+	    'note': true
+	  }
 	};
 
 
@@ -38509,6 +38533,181 @@ var birchoutline =
 	}
 	
 	module.exports = encode;
+
+/***/ },
+/* 198 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var CompositeDisposable, Emitter, ItemPathQuery, _, ref;
+	
+	ref = __webpack_require__(3), Emitter = ref.Emitter, CompositeDisposable = ref.CompositeDisposable;
+	
+	_ = __webpack_require__(14);
+	
+	module.exports = ItemPathQuery = (function() {
+	  ItemPathQuery.prototype.outline = null;
+	
+	  ItemPathQuery.prototype.outlineSubscription = null;
+	
+	  ItemPathQuery.prototype.outlineDestroyedSubscription = null;
+	
+	  ItemPathQuery.prototype.debouncedRun = null;
+	
+	  function ItemPathQuery(outline1, itemPath1) {
+	    this.outline = outline1;
+	    this.itemPath = itemPath1;
+	    this.emitter = new Emitter();
+	    this.debouncedRun = this.run.bind(this);
+	    this.outlineDestroyedSubscription = this.outline.onDidDestroy((function(_this) {
+	      return function() {
+	        return _this.destroy();
+	      };
+	    })(this));
+	    this.queryFunction = function(outline, contextItem, itemPath, options) {
+	      return outline.evaluateItemPath(itemPath, contextItem, options);
+	    };
+	  }
+	
+	  ItemPathQuery.prototype.destroy = function() {
+	    if (!this.destroyed) {
+	      this.stop();
+	      this.outlineDestroyedSubscription.dispose();
+	      this.emitter.emit('did-destroy');
+	      this.outline = null;
+	      return this.destroyed = true;
+	    }
+	  };
+	
+	
+	  /*
+	  Section: Events
+	   */
+	
+	  ItemPathQuery.prototype.onDidChange = function(callback) {
+	    return this.emitter.on('did-change', callback);
+	  };
+	
+	  ItemPathQuery.prototype.onDidDestroy = function(callback) {
+	    return this.emitter.on('did-destroy', callback);
+	  };
+	
+	
+	  /*
+	  Section: Configuring Queries
+	   */
+	
+	  ItemPathQuery.prototype.contextItem = null;
+	
+	  Object.defineProperty(ItemPathQuery.prototype, 'contextItem', {
+	    get: function() {
+	      return this._contextItem;
+	    },
+	    set: function(_contextItem) {
+	      this._contextItem = _contextItem;
+	      return this.scheduleRun();
+	    }
+	  });
+	
+	  ItemPathQuery.prototype.itemPath = null;
+	
+	  Object.defineProperty(ItemPathQuery.prototype, 'itemPath', {
+	    get: function() {
+	      return this._itemPath;
+	    },
+	    set: function(_itemPath) {
+	      this._itemPath = _itemPath;
+	      return this.scheduleRun();
+	    }
+	  });
+	
+	  ItemPathQuery.prototype.options = null;
+	
+	  Object.defineProperty(ItemPathQuery.prototype, 'options', {
+	    get: function() {
+	      return this._options;
+	    },
+	    set: function(_options) {
+	      var ref1;
+	      this._options = _options;
+	      if ((ref1 = this._options) != null ? ref1.debounce : void 0) {
+	        this.debouncedRun = _.debounce(this.run.bind(this), this._options.debounce);
+	      } else {
+	        this.debouncedRun = this.run.bind(this);
+	      }
+	      return this.scheduleRun();
+	    }
+	  });
+	
+	  ItemPathQuery.prototype.queryFunction = null;
+	
+	  Object.defineProperty(ItemPathQuery.prototype, 'queryFunction', {
+	    get: function() {
+	      return this._queryFunction;
+	    },
+	    set: function(_queryFunction) {
+	      this._queryFunction = _queryFunction;
+	      return this.scheduleRun();
+	    }
+	  });
+	
+	
+	  /*
+	  Section: Running Queries
+	   */
+	
+	  ItemPathQuery.prototype.started = false;
+	
+	  ItemPathQuery.prototype.start = function() {
+	    if (this.started) {
+	      return;
+	    }
+	    this.started = true;
+	    this.outlineSubscription = this.outline.onDidEndChanges((function(_this) {
+	      return function(changes) {
+	        if (changes.length > 0) {
+	          return _this.scheduleRun();
+	        }
+	      };
+	    })(this));
+	    return this.run();
+	  };
+	
+	  ItemPathQuery.prototype.stop = function() {
+	    if (!this.started) {
+	      return;
+	    }
+	    this.started = false;
+	    return this.outlineSubscription.dispose();
+	  };
+	
+	  ItemPathQuery.prototype.scheduleRun = function() {
+	    if (this.started) {
+	      return this.debouncedRun();
+	    }
+	  };
+	
+	  ItemPathQuery.prototype.run = function() {
+	    var nextResults;
+	    if (this.started) {
+	      nextResults = this.queryFunction(this.outline, this.contextItem, this.itemPath, this.options);
+	      if (!_.isEqual(this.results, nextResults)) {
+	        this.results = nextResults;
+	        return this.emitter.emit('did-change', this.results);
+	      }
+	    }
+	  };
+	
+	
+	  /*
+	  Section: Getting Query Results
+	   */
+	
+	  ItemPathQuery.prototype.results = [];
+	
+	  return ItemPathQuery;
+	
+	})();
+
 
 /***/ }
 /******/ ]);

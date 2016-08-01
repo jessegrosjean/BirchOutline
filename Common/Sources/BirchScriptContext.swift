@@ -63,6 +63,51 @@ public class BirchScriptContext {
         return Outline(jsOutline: jsOutlineClass.constructWithArguments(["text/taskpaper", content ?? ""]))
     }
     
+    public func syntaxHighlightItemPath(attributedString: NSMutableAttributedString) {
+        guard attributedString.length > 0 else {
+            return
+        }
+        
+        let parseInfo = jsItemPathClass.invokeMethod("parse", withArguments: [attributedString.string]).toDictionary() as NSDictionary
+        let keywords = parseInfo["keywords"] as! [[String: AnyObject]]
+        let defaultAttributes = [
+            NSFontAttributeName: NSFont.systemFontOfSize(0)
+        ]
+        
+        attributedString.beginEditing()
+        attributedString.setAttributes(defaultAttributes, range: NSMakeRange(0, attributedString.length))
+        
+        for each in keywords {
+            let offset = each["offset"] as! Int
+            let label = each["label"] as! String
+            let text = each["text"] as! String
+            let range = NSMakeRange(offset, text.utf8.count)
+
+            switch label {
+            case "keyword.set", "keyword.boolean":
+                attributedString.addAttribute(NSFontAttributeName, value: NSFont.boldSystemFontOfSize(0), range: range)
+            case "keyword.operation.relation",
+                 "keyword.operation.modifier":
+                attributedString.addAttribute(NSForegroundColorAttributeName, value: NSColor.grayColor(), range: range)
+            case "string.quoted",
+                 "string.unquoted":
+                break;
+            case "entity.other.axis",
+                 "entity.other.tag",
+                 "entity.other.attribute-name":
+                attributedString.addAttribute(NSForegroundColorAttributeName, value: NSColor.grayColor(), range: range)
+            default:
+                break
+            }
+        }
+        
+        if let errorOffset = parseInfo.valueForKeyPath("error.location.start.offset") as? Int {
+            attributedString.addAttribute(NSForegroundColorAttributeName, value: NSColor.redColor(), range: NSMakeRange(errorOffset, attributedString.length - errorOffset))
+        }
+        
+        attributedString.endEditing()
+    }
+    
 }
 
 func setExceptionHandler(context: JSContext) {

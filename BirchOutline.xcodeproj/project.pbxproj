@@ -43,6 +43,7 @@
 		436C0DEF1D1D65210089FA7A /* JavaScriptContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDA1D1D64CC0089FA7A /* JavaScriptContextTests.swift */; };
 		436C0DF01D1D65230089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
 		436C0DF11D1D65240089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
+		4391F82D1D4FEFEA00ED3CF9 /* MutationType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4300222A1D4435AA00E7908D /* MutationType.swift */; };
 		43E6193E1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
 		43E6193F1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
 		43E619501D244344001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6194F1D244344001E3F4D /* birchoutline.js */; };
@@ -520,6 +521,7 @@
 				436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */,
 				436C0DE71D1D65100089FA7A /* JSValue.swift in Sources */,
 				436C0DDF1D1D64D40089FA7A /* BirchOutline.swift in Sources */,
+				4391F82D1D4FEFEA00ED3CF9 /* MutationType.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

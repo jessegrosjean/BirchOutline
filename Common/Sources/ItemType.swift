@@ -34,6 +34,7 @@ public protocol ItemType: AnyObject {
     func setAttribute(name: String, value: AnyObject)
     
     var body: String { get set }
+    var bodyContent: String { get }
     
 }
 
@@ -118,5 +119,9 @@ extension JSValue: ItemType {
             setValue(value, forProperty: "bodyString")
         }
     }
-
+    
+    public var bodyContent: String {
+        return valueForProperty("bodyContentString").toString()
+    }
+    
 }

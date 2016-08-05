@@ -50,6 +50,7 @@ public class Mutation: MutationType {
             return .Children
         default:
             assert(false, "Unexpected mutation type string")
+            return .Attribute // swift compiler error otherwise
         }
     }
     

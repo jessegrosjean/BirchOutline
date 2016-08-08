@@ -54,7 +54,8 @@ var birchoutline =
 	  ItemPath: __webpack_require__(181),
 	  DateTime: __webpack_require__(76),
 	  AttributedString: __webpack_require__(7),
-	  ItemPathQuery: __webpack_require__(198),
+	  Extensions: __webpack_require__(198),
+	  ItemPathQuery: __webpack_require__(199),
 	  SpanBuffer: __webpack_require__(9),
 	  Span: __webpack_require__(13),
 	  shortid: __webpack_require__(193),
@@ -4626,7 +4627,7 @@ var birchoutline =
 	  results = [];
 	  for (attribute in attributes) {
 	    value = attributes[attribute];
-	    assert(_.isString(attribute), "Expected " + attribute + " to be string");
+	    assert(typeof attribute === 'string', "Expected " + attribute + " to be string");
 	    if (value) {
 	      if (_.isObject(value)) {
 	        results.push((function() {
@@ -4634,13 +4635,13 @@ var birchoutline =
 	          results1 = [];
 	          for (attribute in value) {
 	            value = value[attribute];
-	            assert(_.isString(attribute), "Expected " + attribute + " to be string");
-	            results1.push(assert(_.isString(value), "Expected " + value + " to be string"));
+	            assert(typeof attribute === 'string', "Expected " + attribute + " to be string");
+	            results1.push(assert(typeof value === 'string', "Expected " + value + " to be string"));
 	          }
 	          return results1;
 	        })());
 	      } else {
-	        results.push(assert(_.isString(value), "Expected " + value + " to be string"));
+	        results.push(assert(typeof value === 'string', "Expected " + value + " to be string"));
 	      }
 	    } else {
 	      results.push(void 0);
@@ -14867,7 +14868,7 @@ var birchoutline =
 	        if (!nodeRange || nodeRange.end <= runLocation) {
 	          if (bmlTags[attributeName]) {
 	            element = dom.createElement(attributeName);
-	            if (_.isString(attributeValue)) {
+	            if (typeof attributeValue === 'string') {
 	              element.attribs['value'] = attributeValue;
 	            } else if (_.isObject(attributeValue)) {
 	              for (attrName in attributeValue) {
@@ -15108,7 +15109,7 @@ var birchoutline =
 	    if (options == null) {
 	      options = {};
 	    }
-	    if (_.isString(options)) {
+	    if (typeof options === 'string') {
 	      options = {
 	        type: options
 	      };
@@ -16016,7 +16017,7 @@ var birchoutline =
 	  Item.prototype.getAttribute = function(name, clazz, array) {
 	    var each, ref, value;
 	    if (value = (ref = this.attributes) != null ? ref[name] : void 0) {
-	      if (array && _.isString(value)) {
+	      if (array && (typeof value === 'string')) {
 	        value = value.split(/\s*,\s*/);
 	        if (clazz) {
 	          value = (function() {
@@ -16029,7 +16030,7 @@ var birchoutline =
 	            return results1;
 	          })();
 	        }
-	      } else if (clazz && _.isString(value)) {
+	      } else if (clazz && (typeof value === 'string')) {
 	        value = Item.attributeValueStringToObject(value, clazz);
 	      }
 	    }
@@ -16092,6 +16093,15 @@ var birchoutline =
 	  };
 	
 	  Item.objectToAttributeValueString = function(object) {
+	
+	    /*
+	    switch typeof object
+	      when 'object'
+	        object.toString()
+	      when 'string'
+	        object
+	      when
+	     */
 	    var each;
 	    if (_.isNumber(object)) {
 	      return object.toString();
@@ -32891,7 +32901,7 @@ var birchoutline =
 	    if (options == null) {
 	      options = {};
 	    }
-	    if (_.isString(itemPath)) {
+	    if (typeof itemPath === 'string') {
 	      itemPath = new ItemPath(itemPath, options);
 	    }
 	    itemPath.options = options;
@@ -38536,6 +38546,69 @@ var birchoutline =
 
 /***/ },
 /* 198 */
+/***/ function(module, exports) {
+
+	var Extensions;
+	
+	module.exports = Extensions = (function() {
+	  Extensions.PRIORITY_NORMAL = 0;
+	
+	  Extensions.PRIORITY_FIRST = -1.;
+	
+	  Extensions.PRIORITY_LAST = 1;
+	
+	  function Extensions() {
+	    this.extensionPointsToExtensions = new Map;
+	  }
+	
+	  Extensions.prototype.add = function(extensionPoint, extension, priority) {
+	    var extensions;
+	    if (priority == null) {
+	      priority = Extensions.PRIORITY_NORMAL;
+	    }
+	    extensions = this.extensionPointsToExtensions.get(extensionPoint);
+	    if (!extensions) {
+	      extensions = [];
+	      this.extensionPointsToExtensions.set(extensionPoint, extensions);
+	    }
+	    extensions.needsSort = true;
+	    return extensions.push({
+	      extension: extension,
+	      priority: priority
+	    });
+	  };
+	
+	  Extensions.prototype.remove = function(extensionPoint, extension) {
+	    var ref, result;
+	    return result = (ref = this.extensionPointsToExtensions.get(extensionPoint)) != null ? ref.filter : void 0;
+	  };
+	
+	  Extensions.prototype.processExtensions = function(extensionPoint, callback, returnFirst) {
+	    var each, extensions, i, len, result;
+	    extensions = this.extensionPointsToExtensions.get(extensionPoint);
+	    if (extensions) {
+	      if (extensions.needsSort) {
+	        extensions.sort(function(a, b) {
+	          return a.priority - b.priority;
+	        });
+	      }
+	      for (i = 0, len = extensions.length; i < len; i++) {
+	        each = extensions[i];
+	        result = callback(each);
+	        if (result !== void 0 && returnFirst) {
+	          return result;
+	        }
+	      }
+	    }
+	  };
+	
+	  return Extensions;
+	
+	})();
+
+
+/***/ },
+/* 199 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var CompositeDisposable, Emitter, ItemPathQuery, _, ref;

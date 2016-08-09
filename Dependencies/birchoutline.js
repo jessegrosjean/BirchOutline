@@ -56,10 +56,10 @@ var birchoutline =
 	  AttributedString: __webpack_require__(7),
 	  Extensions: __webpack_require__(198),
 	  ItemPathQuery: __webpack_require__(199),
-	  SpanBuffer: __webpack_require__(9),
+	  SpanBuffer: __webpack_require__(10),
 	  Span: __webpack_require__(13),
 	  shortid: __webpack_require__(193),
-	  util: __webpack_require__(12)
+	  util: __webpack_require__(9)
 	};
 
 
@@ -95,7 +95,7 @@ var birchoutline =
 	
 	_ = __webpack_require__(14);
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	Birch = __webpack_require__(1);
 	
@@ -423,10 +423,7 @@ var birchoutline =
 	    assert(item.outline === this, 'Item must be owned by this outline');
 	    clonedItem = this.createItem(item.bodyAttributedString.clone());
 	    if (item.attributes) {
-	      clonedItem.attributes = _.clone(item.attributes);
-	    }
-	    if (item.userData) {
-	      clonedItem.userData = _.clone(item.userData);
+	      clonedItem.attributes = Object.assign({}, item.attributes);
 	    }
 	    clonedItem.indent = item.depth;
 	    if (deep && (eachChild = item.firstChild)) {
@@ -467,10 +464,7 @@ var birchoutline =
 	    assert(item.outline !== this, 'Item must not be owned by this outline');
 	    importedItem = this.createItem(item.bodyAttributedString.clone(), item.id, remapIDCallback);
 	    if (item.attributes) {
-	      importedItem.attributes = _.clone(item.attributes);
-	    }
-	    if (item.userData) {
-	      importedItem.userData = _.clone(item.userData);
+	      importedItem.attributes = Object.assign({}, item.attributes);
 	    }
 	    if (deep && (eachChild = item.firstChild)) {
 	      children = [];
@@ -489,7 +483,7 @@ var birchoutline =
 	   */
 	
 	  Outline.prototype.insertItemsBefore = function(items, referenceItem) {
-	    if (!_.isArray(items)) {
+	    if (!Array.isArray(items)) {
 	      items = [items];
 	    }
 	    if (!items.length) {
@@ -558,7 +552,7 @@ var birchoutline =
 	
 	  Outline.prototype.removeItems = function(items) {
 	    var contiguousItemRanges, currentRange, each, i, len, previousItem;
-	    if (!_.isArray(items)) {
+	    if (!Array.isArray(items)) {
 	      items = [items];
 	    }
 	    if (!(items.length > 0)) {
@@ -1399,11 +1393,13 @@ var birchoutline =
 /* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var RunBuffer, RunSpan, SpanBuffer,
+	var RunBuffer, RunSpan, SpanBuffer, shallowObjectEqual,
 	  extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	  hasProp = {}.hasOwnProperty;
 	
-	SpanBuffer = __webpack_require__(9);
+	shallowObjectEqual = __webpack_require__(9).shallowObjectEqual;
+	
+	SpanBuffer = __webpack_require__(10);
 	
 	RunSpan = __webpack_require__(17);
 	
@@ -1469,7 +1465,7 @@ var birchoutline =
 	    }
 	    if (longestEffectiveRange) {
 	      this._longestEffectiveRange(start.spanIndex, start.span, longestEffectiveRange, function(run) {
-	        return _.isEqual(run.attributes, result);
+	        return shallowObjectEqual(run.attributes, result);
 	      });
 	    }
 	    return result;
@@ -1571,19 +1567,94 @@ var birchoutline =
 
 /***/ },
 /* 9 */
+/***/ function(module, exports) {
+
+	module.exports = {
+	  assert: function(condition, message) {
+	    if (message == null) {
+	      message = 'Failed Assert';
+	    }
+	    if (!condition) {
+	      throw new Error(message);
+	    }
+	  },
+	  repeat: function(pattern, count) {
+	    var result;
+	    if (count <= 0) {
+	      return '';
+	    } else {
+	      result = '';
+	      while (count > 1) {
+	        if (count & 1) {
+	          result += pattern;
+	        }
+	        count >>= 1;
+	        pattern += pattern;
+	      }
+	      return result + pattern;
+	    }
+	  },
+	  shallowArrayEqual: function(a, b) {
+	    var i, index, len, value;
+	    if (!a && !b) {
+	      return true;
+	    }
+	    if (!a && b || a && !b) {
+	      return false;
+	    }
+	    if (a.length !== b.length) {
+	      return false;
+	    }
+	    for (index = i = 0, len = a.length; i < len; index = ++i) {
+	      value = a[index];
+	      if (b[index] !== value) {
+	        return false;
+	      }
+	    }
+	    return true;
+	  },
+	  shallowObjectEqual: function(a, b) {
+	    var i, j, key, len, len1, numKeysA, numKeysB, ref;
+	    if (!a && !b) {
+	      return true;
+	    }
+	    if (!a && b || a && !b) {
+	      return false;
+	    }
+	    numKeysA = 0;
+	    numKeysB = 0;
+	    ref = Object.keys(b);
+	    for (i = 0, len = ref.length; i < len; i++) {
+	      key = ref[i];
+	      numKeysB++;
+	      if (!a[key] !== b[key]) {
+	        return false;
+	      }
+	    }
+	    for (j = 0, len1 = a.length; j < len1; j++) {
+	      key = a[j];
+	      numKeysA++;
+	    }
+	    return numKeysA === numKeysB;
+	  }
+	};
+
+
+/***/ },
+/* 10 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var Emitter, Span, SpanBranch, SpanBuffer, SpanLeaf, assert,
 	  extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	  hasProp = {}.hasOwnProperty;
 	
-	SpanBranch = __webpack_require__(10);
+	SpanBranch = __webpack_require__(11);
 	
-	SpanLeaf = __webpack_require__(11);
+	SpanLeaf = __webpack_require__(12);
 	
 	Emitter = __webpack_require__(3).Emitter;
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	Span = __webpack_require__(13);
 	
@@ -1951,12 +2022,12 @@ var birchoutline =
 
 
 /***/ },
-/* 10 */
+/* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var SpanBranch, SpanLeaf;
 	
-	SpanLeaf = __webpack_require__(11);
+	SpanLeaf = __webpack_require__(12);
 	
 	SpanBranch = (function() {
 	  function SpanBranch(children1) {
@@ -2270,7 +2341,7 @@ var birchoutline =
 
 
 /***/ },
-/* 11 */
+/* 12 */
 /***/ function(module, exports) {
 
 	var SpanLeaf;
@@ -2437,38 +2508,6 @@ var birchoutline =
 	})();
 	
 	module.exports = SpanLeaf;
-
-
-/***/ },
-/* 12 */
-/***/ function(module, exports) {
-
-	module.exports = {
-	  assert: function(condition, message) {
-	    if (message == null) {
-	      message = 'Failed Assert';
-	    }
-	    if (!condition) {
-	      throw new Error(message);
-	    }
-	  },
-	  repeat: function(pattern, count) {
-	    var result;
-	    if (count <= 0) {
-	      return '';
-	    } else {
-	      result = '';
-	      while (count > 1) {
-	        if (count & 1) {
-	          result += pattern;
-	        }
-	        count >>= 1;
-	        pattern += pattern;
-	      }
-	      return result + pattern;
-	    }
-	  }
-	};
 
 
 /***/ },
@@ -4612,15 +4651,13 @@ var birchoutline =
 /* 17 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var RunSpan, Span, _, assert, validateAttributes,
+	var RunSpan, Span, assert, ref, shallowObjectEqual, validateAttributes,
 	  extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
 	  hasProp = {}.hasOwnProperty;
 	
+	ref = __webpack_require__(9), assert = ref.assert, shallowObjectEqual = ref.shallowObjectEqual;
+	
 	Span = __webpack_require__(13);
-	
-	_ = __webpack_require__(14);
-	
-	assert = __webpack_require__(12).assert;
 	
 	validateAttributes = function(attributes) {
 	  var attribute, results, value;
@@ -4663,7 +4700,7 @@ var birchoutline =
 	  RunSpan.prototype.clone = function() {
 	    var clone;
 	    clone = RunSpan.__super__.clone.call(this);
-	    clone.attributes = _.clone(this.attributes);
+	    clone.attributes = Object.assign({}, this.attributes);
 	    return clone;
 	  };
 	
@@ -4678,7 +4715,7 @@ var birchoutline =
 	    if (attributes == null) {
 	      attributes = {};
 	    }
-	    return this.attributes = _.clone(attributes);
+	    return this.attributes = Object.assign({}, attributes);
 	  };
 	
 	  RunSpan.prototype.addAttribute = function(attribute, value) {
@@ -4700,7 +4737,7 @@ var birchoutline =
 	  };
 	
 	  RunSpan.prototype.mergeWithSpan = function(run) {
-	    if (_.isEqual(this.attributes, run.attributes)) {
+	    if (shallowObjectEqual(this.attributes, run.attributes)) {
 	      this.setString(this.string + run.string);
 	      return true;
 	    } else {
@@ -4752,7 +4789,7 @@ var birchoutline =
 	
 	htmlparser = __webpack_require__(21);
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	dom = __webpack_require__(71);
 	
@@ -14557,7 +14594,7 @@ var birchoutline =
 	
 	cloneNode = function(node) {
 	  var clone, each, i, len, ref;
-	  clone = _.clone(node);
+	  clone = Object.assign({}, node);
 	  if (clone.children) {
 	    clone.children = [];
 	    ref = node.children;
@@ -14722,7 +14759,7 @@ var birchoutline =
 	    return;
 	  }
 	  if (((ref = element.children) != null ? ref.length : void 0) > 0) {
-	    ref1 = _.clone(element.children);
+	    ref1 = element.children.slice();
 	    results = [];
 	    for (i = 0, len = ref1.length; i < len; i++) {
 	      each = ref1[i];
@@ -14752,7 +14789,7 @@ var birchoutline =
 	  }
 	  if (element.children.length > 0) {
 	    childIndent = indent + '  ';
-	    ref = _.clone(element.children);
+	    ref = element.children.slice();
 	    for (i = 0, len = ref.length; i < len; i++) {
 	      each = ref[i];
 	      domutils.prepend(each, createTextNode(childIndent));
@@ -15364,7 +15401,7 @@ var birchoutline =
 	
 	_ = __webpack_require__(14);
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	module.exports = Item = (function() {
 	  function Item(outline, text, id, remappedIDCallback) {
@@ -15848,7 +15885,7 @@ var birchoutline =
 	    if (maintainIndentHack == null) {
 	      maintainIndentHack = false;
 	    }
-	    if (!_.isArray(children)) {
+	    if (!Array.isArray(children)) {
 	      children = [children];
 	    }
 	    if (!children.length) {
@@ -15920,7 +15957,7 @@ var birchoutline =
 	
 	  Item.prototype.removeChildren = function(children) {
 	    var depth, each, eachIndent, firstChild, isInOutline, j, lastChild, len, mutation, nextSibling, outline, previousSibling;
-	    if (!_.isArray(children)) {
+	    if (!Array.isArray(children)) {
 	      children = [children];
 	    }
 	    if (!children.length) {
@@ -16093,36 +16130,32 @@ var birchoutline =
 	  };
 	
 	  Item.objectToAttributeValueString = function(object) {
-	
-	    /*
-	    switch typeof object
-	      when 'object'
-	        object.toString()
-	      when 'string'
-	        object
-	      when
-	     */
 	    var each;
-	    if (_.isNumber(object)) {
-	      return object.toString();
-	    } else if (_.isString(object)) {
-	      return object;
-	    } else if (_.isDate(object)) {
-	      return object.toISOString();
-	    } else if (_.isArray(object)) {
-	      return ((function() {
-	        var j, len, results1;
-	        results1 = [];
-	        for (j = 0, len = object.length; j < len; j++) {
-	          each = object[j];
-	          results1.push(Item.objectToAttributeValueString(each));
+	    switch (typeof object) {
+	      case 'string':
+	        return object;
+	      case 'number':
+	        return object.toString();
+	      case 'object':
+	        return object.toString();
+	      default:
+	        if (object instanceof Date) {
+	          return object.toISOString();
+	        } else if (Array.isArray(object)) {
+	          return ((function() {
+	            var j, len, results1;
+	            results1 = [];
+	            for (j = 0, len = object.length; j < len; j++) {
+	              each = object[j];
+	              results1.push(Item.objectToAttributeValueString(each));
+	            }
+	            return results1;
+	          })()).join(',');
+	        } else if (object) {
+	          return object.toString();
+	        } else {
+	          return object;
 	        }
-	        return results1;
-	      })()).join(',');
-	    } else if (object) {
-	      return object.toString();
-	    } else {
-	      return object;
 	    }
 	  };
 	
@@ -33242,7 +33275,7 @@ var birchoutline =
 	    }
 	    evaluatedValue = predicate[cacheName];
 	    if (!evaluatedValue) {
-	      if (_.isArray(value)) {
+	      if (value instanceof Array) {
 	        evaluatedValue = this.evaluateFunction(value, item);
 	        cacheName = null;
 	      } else {
@@ -33523,7 +33556,7 @@ var birchoutline =
 	    if (!value) {
 	      return;
 	    }
-	    if (_.isArray(value)) {
+	    if (value instanceof Array) {
 	      functionName = value[0];
 	      if (functionName === 'getAttribute') {
 	        return '@' + value.slice(1).join(':');
@@ -36894,9 +36927,9 @@ var birchoutline =
 
 	var Mutation, assert;
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	module.exports = Mutation = (function() {
 	
@@ -37123,7 +37156,7 @@ var birchoutline =
 	
 	ElementType = __webpack_require__(20);
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	Birch = __webpack_require__(1);
 	
@@ -37325,7 +37358,7 @@ var birchoutline =
 	
 	htmlparser = __webpack_require__(21);
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	_ = __webpack_require__(14);
 	
@@ -37475,7 +37508,7 @@ var birchoutline =
 	
 	changeDelegate = __webpack_require__(188);
 	
-	repeat = __webpack_require__(12).repeat;
+	repeat = __webpack_require__(9).repeat;
 	
 	text = __webpack_require__(191);
 	
@@ -37933,7 +37966,7 @@ var birchoutline =
 
 	var Item, _parseLinesAndNormalizeIndentation, beginSerialization, beginSerializeItem, deserializeItem, deserializeItemBody, deserializeItems, emptyEncodeLastItem, endSerialization, endSerializeItem, repeat, serializeItemBody;
 	
-	repeat = __webpack_require__(12).repeat;
+	repeat = __webpack_require__(9).repeat;
 	
 	Item = __webpack_require__(75);
 	
@@ -38085,7 +38118,7 @@ var birchoutline =
 	
 	Emitter = __webpack_require__(3).Emitter;
 	
-	assert = __webpack_require__(12).assert;
+	assert = __webpack_require__(9).assert;
 	
 	module.exports = UndoManager = (function() {
 	  function UndoManager() {
@@ -38611,9 +38644,11 @@ var birchoutline =
 /* 199 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var CompositeDisposable, Emitter, ItemPathQuery, _, ref;
+	var CompositeDisposable, Emitter, ItemPathQuery, _, ref, util;
 	
 	ref = __webpack_require__(3), Emitter = ref.Emitter, CompositeDisposable = ref.CompositeDisposable;
+	
+	util = __webpack_require__(9);
 	
 	_ = __webpack_require__(14);
 	
@@ -38763,7 +38798,7 @@ var birchoutline =
 	    var nextResults;
 	    if (this.started) {
 	      nextResults = this.queryFunction(this.outline, this.contextItem, this.itemPath, this.options);
-	      if (!_.isEqual(this.results, nextResults)) {
+	      if (!util.shallowArrayEqual(this.results, nextResults)) {
 	        this.results = nextResults;
 	        return this.emitter.emit('did-change', this.results);
 	      }

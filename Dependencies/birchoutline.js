@@ -33275,7 +33275,7 @@ var birchoutline =
 	    }
 	    evaluatedValue = predicate[cacheName];
 	    if (!evaluatedValue) {
-	      if (value instanceof Array) {
+	      if (Array.isArray(value)) {
 	        evaluatedValue = this.evaluateFunction(value, item);
 	        cacheName = null;
 	      } else {
@@ -33556,7 +33556,7 @@ var birchoutline =
 	    if (!value) {
 	      return;
 	    }
-	    if (value instanceof Array) {
+	    if (Array.isArray(value)) {
 	      functionName = value[0];
 	      if (functionName === 'getAttribute') {
 	        return '@' + value.slice(1).join(':');

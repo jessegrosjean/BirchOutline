@@ -11,7 +11,7 @@ import JavaScriptCore
 
 public protocol ItemPathQueryType: AnyObject {
     
-    func onDidChange(callback: (items: [ItemType]) -> Void) -> DisposableType
+    func onDidChange(_ callback: @escaping (_ items: [ItemType]) -> Void) -> DisposableType
 
     var itemPath: String { get set }
     
@@ -23,7 +23,7 @@ public protocol ItemPathQueryType: AnyObject {
     
 }
 
-public class ItemPathQuery: ItemPathQueryType {
+open class ItemPathQuery: ItemPathQueryType {
     
     var jsItemPathQuery: JSValue
     
@@ -31,35 +31,35 @@ public class ItemPathQuery: ItemPathQueryType {
         self.jsItemPathQuery = jsItemPathQuery
     }
     
-    public func onDidChange(callback: (items: [ItemType]) -> Void) -> DisposableType {
-        let callbackWrapper: @convention(block) (items: JSValue) -> Void = { items in
-            callback(items: items.toItemTypeArray())
+    open func onDidChange(_ callback: @escaping (_ items: [ItemType]) -> Void) -> DisposableType {
+        let callbackWrapper: @convention(block) (_ items: JSValue) -> Void = { items in
+            callback(items.toItemTypeArray())
         }
-        return jsItemPathQuery.invokeMethod("onDidChange", withArguments: [unsafeBitCast(callbackWrapper, AnyObject.self)])
+        return jsItemPathQuery.invokeMethod("onDidChange", withArguments: [unsafeBitCast(callbackWrapper, to: AnyObject.self)])
     }
     
-    public var itemPath: String {
+    open var itemPath: String {
         get {
-            return jsItemPathQuery.valueForProperty("itemPath").toString()
+            return jsItemPathQuery.forProperty("itemPath").toString()
         }
         set(value) {
             return jsItemPathQuery.setValue(itemPath, forProperty: "itemPath")
         }
     }
     
-    public var started: Bool {
-        return jsItemPathQuery.valueForProperty("started").toBool()
+    open var started: Bool {
+        return jsItemPathQuery.forProperty("started").toBool()
     }
     
-    public func start() {
+    open func start() {
         jsItemPathQuery.invokeMethod("start", withArguments: [])
     }
     
-    public func stop() {
+    open func stop() {
         jsItemPathQuery.invokeMethod("stop", withArguments: [])
     }
     
-    public var results: [ItemType] {
+    open var results: [ItemType] {
         return jsItemPathQuery.invokeMethod("items", withArguments: []).toItemTypeArray()
     }
 

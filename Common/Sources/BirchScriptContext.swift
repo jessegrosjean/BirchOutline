@@ -9,33 +9,33 @@
 import JavaScriptCore
 import WebKit
 
-public class BirchScriptContext {
+open class BirchScriptContext {
     
-    public var context: JSContext!    
-    public var jsBirchExports: JSValue!
+    open var context: JSContext!    
+    open var jsBirchExports: JSValue!
     
     var jsOutlineClass: JSValue {
-        return jsBirchExports.valueForProperty("Outline")
+        return jsBirchExports.forProperty("Outline")
     }
 
     var jsItemClass: JSValue {
-        return jsBirchExports.valueForProperty("Item")
+        return jsBirchExports.forProperty("Item")
     }
 
     var jsMutationClass: JSValue {
-        return jsBirchExports.valueForProperty("Mutation")
+        return jsBirchExports.forProperty("Mutation")
     }
     
     var jsItemSerializerClass: JSValue {
-        return jsBirchExports.valueForProperty("ItemSerializer")
+        return jsBirchExports.forProperty("ItemSerializer")
     }
 
     var jsDateTimeClass: JSValue {
-        return jsBirchExports.valueForProperty("DateTime")
+        return jsBirchExports.forProperty("DateTime")
     }
 
     var jsItemPathClass: JSValue {
-        return jsBirchExports.valueForProperty("ItemPath")
+        return jsBirchExports.forProperty("ItemPath")
     }
 
     public init (scriptPath: String? = nil) {
@@ -45,8 +45,8 @@ public class BirchScriptContext {
         setExceptionHandler(context)
         setTimeoutAndClearTimeoutHandlers(context)
         
-        let bundle = NSBundle(forClass: BirchScriptContext.self)
-        let path = scriptPath ?? bundle.pathForResource("birchoutline", ofType: "js")
+        let bundle = Bundle(for: BirchScriptContext.self)
+        let path = scriptPath ?? bundle.path(forResource: "birchoutline", ofType: "js")
         let script = try! String(contentsOfFile: path!)
         let birchExportsName = path?.lastPathComponent.stringByDeletingPathExtension
         
@@ -55,24 +55,32 @@ public class BirchScriptContext {
         jsBirchExports = context.objectForKeyedSubscript(birchExportsName)
     }
     
-    public func createOutline(type: String?, content: String?) -> OutlineType {
-        return Outline(jsOutline: jsOutlineClass.constructWithArguments([type ?? "text/plain", content ?? ""]))
+    open func createOutline(_ type: String?, content: String?) -> OutlineType {
+        return Outline(jsOutline: jsOutlineClass.construct(withArguments: [type ?? "text/plain", content ?? ""]))
     }
     
-    public func createTaskPaperOutline(content: String?) -> OutlineType {
-        return Outline(jsOutline: jsOutlineClass.constructWithArguments(["text/taskpaper", content ?? ""]))
+    open func createTaskPaperOutline(_ content: String?) -> OutlineType {
+        return Outline(jsOutline: jsOutlineClass.construct(withArguments: ["text/taskpaper", content ?? ""]))
+    }
+    
+    open func garbageCollect() {
+        #if os(OSX)
+            context.garbageCollect()
+        #endif
     }
     
 }
 
-func setExceptionHandler(context: JSContext) {
+func setExceptionHandler(_ context: JSContext) {
     context.exceptionHandler = { context, exception in
-        cpAlert("Uncaught JavaScript Exception".localized(), informativeText: "\(exception)\n\n\(exception.valueForProperty("stack"))".localized())
+        let message = NSLocalizedString("Uncaught JavaScript Exception", tableName: "JavascriptException", comment: "message text")
+        let informativeText = NSLocalizedString("\(exception)\n\n\(exception!.forProperty("stack"))", tableName: "JavascriptException", comment: "informative text")        
+        cpAlert(message, informativeText: informativeText)
         exit(EXIT_SUCCESS)
     }
 }
 
-func setTimeoutAndClearTimeoutHandlers(context: JSContext) {
+func setTimeoutAndClearTimeoutHandlers(_ context: JSContext) {
     var setTimeoutID: Int32 = 1
     var setTimeOutIDsToCallbacks = [Int32:JSValue]()
     
@@ -80,16 +88,16 @@ func setTimeoutAndClearTimeoutHandlers(context: JSContext) {
         let thisTimeOutID = setTimeoutID
         setTimeoutID += 1
         setTimeOutIDsToCallbacks[thisTimeOutID] = callback
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, Int64(UInt64(wait) * NSEC_PER_MSEC)), dispatch_get_main_queue(), { () -> Void in
-            setTimeOutIDsToCallbacks[thisTimeOutID]?.callWithArguments([])
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + Double(Int64(UInt64(wait) * NSEC_PER_MSEC)) / Double(NSEC_PER_SEC), execute: { () -> Void in
+            let _ = setTimeOutIDsToCallbacks[thisTimeOutID]?.call(withArguments: [])
         })
-        return JSValue.init(int32: setTimeoutID, inContext: context)
+        return JSValue.init(int32: setTimeoutID, in: context)
     }
     
     let clearTimeout: @convention(block) (JSValue) -> Void = { (timeoutID) in
-        setTimeOutIDsToCallbacks.removeValueForKey(timeoutID.toInt32())
+        setTimeOutIDsToCallbacks.removeValue(forKey: timeoutID.toInt32())
     }
 
-    context.setObject(unsafeBitCast(setTimeout, AnyObject.self), forKeyedSubscript: "setTimeout")
-    context.setObject(unsafeBitCast(clearTimeout, AnyObject.self), forKeyedSubscript: "clearTimeout")
+    context.setObject(unsafeBitCast(setTimeout, to: AnyObject.self), forKeyedSubscript: "setTimeout" as (NSCopying & NSObjectProtocol)!)
+    context.setObject(unsafeBitCast(clearTimeout, to: AnyObject.self), forKeyedSubscript: "clearTimeout" as (NSCopying & NSObjectProtocol)!)
 }

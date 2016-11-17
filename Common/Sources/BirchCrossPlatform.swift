@@ -19,27 +19,27 @@ import Foundation
     extension ChangeKind {
         public init(changeKind: UIDocumentChangeKind) {
             switch changeKind {
-            case .Done:
-                self = .Done
-            case .Undone:
-                self = .Undone
-            case .Redone:
-                self = .Redone
-            case .Cleared:
-                self = .Cleared
+            case .done:
+                self = .done
+            case .undone:
+                self = .undone
+            case .redone:
+                self = .redone
+            case .cleared:
+                self = .cleared
             }
         }
         
         public func toCocoaChangeKind() -> UIDocumentChangeKind {
             switch self {
-            case .Done:
-                return .Done
-            case .Undone:
-                return .Undone
-            case .Redone:
-                return .Redone
-            case .Cleared:
-                return .Cleared
+            case .done:
+                return .done
+            case .undone:
+                return .undone
+            case .redone:
+                return .redone
+            case .cleared:
+                return .cleared
             }
         }
     }
@@ -55,14 +55,14 @@ import Foundation
     extension ChangeKind {
         public init?(changeKind: NSDocumentChangeType) {
             switch changeKind {
-            case .ChangeDone:
-                self = .Done
-            case .ChangeUndone:
-                self = .Undone
-            case .ChangeRedone:
-                self = .Redone
-            case .ChangeCleared:
-                self = .Cleared
+            case .changeDone:
+                self = .done
+            case .changeUndone:
+                self = .undone
+            case .changeRedone:
+                self = .redone
+            case .changeCleared:
+                self = .cleared
             //case ChangeReadOtherContents:
             //case ChangeAutosaved:
             //case ChangeDiscardable:
@@ -73,20 +73,20 @@ import Foundation
         
         public func toCocoaChangeKind() -> NSDocumentChangeType {
             switch self {
-            case .Done:
-                return .ChangeDone
-            case .Undone:
-                return .ChangeUndone
-            case .Redone:
-                return .ChangeRedone
-            case .Cleared:
-                return .ChangeCleared
+            case .done:
+                return .changeDone
+            case .undone:
+                return .changeUndone
+            case .redone:
+                return .changeRedone
+            case .cleared:
+                return .changeCleared
             }
         }
     }
     
 #endif
 
-func cpAlert(messageText: String, informativeText: String = "") {
+func cpAlert(_ messageText: String, informativeText: String = "") {
     print("\(messageText)\n\n\(informativeText)")
 }

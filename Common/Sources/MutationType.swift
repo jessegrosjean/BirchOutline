@@ -11,9 +11,9 @@ import JavaScriptCore
 
 public enum MutationKind {
     
-    case Attribute
-    case Body
-    case Children
+    case attribute
+    case body
+    case children
 
 }
 
@@ -28,52 +28,52 @@ public protocol MutationType: AnyObject {
     
 }
 
-public class Mutation: MutationType {
+open class Mutation: MutationType {
     
-    public var jsMutation: JSValue
+    open var jsMutation: JSValue
     
     init(jsMutation: JSValue) {
         self.jsMutation = jsMutation
     }
     
-    public var target: ItemType {
-        return jsMutation.valueForProperty("target")
+    open var target: ItemType {
+        return jsMutation.forProperty("target")
     }
     
-    public var type: MutationKind {
-        switch jsMutation.valueForProperty("type").toString() {
+    open var type: MutationKind {
+        switch jsMutation.forProperty("type").toString() {
         case "attribute":
-            return .Attribute
+            return .attribute
         case "body":
-            return .Body
+            return .body
         case "children":
-            return .Children
+            return .children
         default:
             assert(false, "Unexpected mutation type string")
-            return .Attribute // swift compiler error otherwise
+            return .attribute // swift compiler error otherwise
         }
     }
     
-    public var addedItems: [ItemType]? {
-        if let addedItems = jsMutation.valueForProperty("addedItems").selfOrNil() {
+    open var addedItems: [ItemType]? {
+        if let addedItems = jsMutation.forProperty("addedItems").selfOrNil() {
             return addedItems.toItemTypeArray()
         }
         return nil
     }
     
-    public var removedItems: [ItemType]? {
-        if let removedItems = jsMutation.valueForProperty("removedItems").selfOrNil() {
+    open var removedItems: [ItemType]? {
+        if let removedItems = jsMutation.forProperty("removedItems").selfOrNil() {
             return removedItems.toItemTypeArray()
         }
         return nil
     }
 
-    public var previousSibling: ItemType? {
-        return jsMutation.valueForProperty("previousSibling").selfOrNil()
+    open var previousSibling: ItemType? {
+        return jsMutation.forProperty("previousSibling").selfOrNil()
     }
 
-    public var nextSibling: ItemType? {
-        return jsMutation.valueForProperty("nextSibling").selfOrNil()
+    open var nextSibling: ItemType? {
+        return jsMutation.forProperty("nextSibling").selfOrNil()
     }
 
 }

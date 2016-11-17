@@ -13,17 +13,21 @@ import JavaScriptCore
 class ItemTests: XCTestCase {
     
     var outline: OutlineType!
+    weak var weakOutline: OutlineType?
     var item: ItemType!
     
     override func setUp() {
         super.setUp()
         
         outline = BirchOutline.createTaskPaperOutline(nil)
+        weakOutline = outline
         item = outline.createItem("hello")
     }
     
     override func tearDown() {
+        item = nil
         outline = nil
+        XCTAssertNil(weakOutline)
     }
     
     func testInit() {

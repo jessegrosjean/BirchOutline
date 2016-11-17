@@ -9,71 +9,87 @@
 import Foundation
 import JavaScriptCore
 
-
 public protocol ItemType: AnyObject {
     
-    var id: String { get }
+    static func getCommonAncestors(_ items: [ItemType]) -> [ItemType]
     
+    var jsOutline: JSValue { get }
+    var id: String { get }
     var parent: ItemType? { get }
     var firstChild: ItemType? { get }
     var lastChild: ItemType? { get }
     var previousSibling: ItemType? { get }
     var nextSibling: ItemType? { get }
     var children: [ItemType] { get }
+    var descendants: [ItemType] { get }
 
-    func contains(item: ItemType) -> Bool
+    func contains(_ item: ItemType) -> Bool
 
-    func insertChildren(children: [ItemType], beforeSibling: ItemType?)
-    func appendChildren(children: [ItemType])
-    func removeChildren(children: [ItemType])
+    func insertChildren(_ children: [ItemType], beforeSibling: ItemType?)
+    func appendChildren(_ children: [ItemType])
+    func removeChildren(_ children: [ItemType])
     func removeFromParent()
 
     var attributes: [String:String] { get }
-    func hasAttribute(name: String) -> Bool
-    func attributeForName(name: String) -> String?
-    func setAttribute(name: String, value: AnyObject)
+    func hasAttribute(_ name: String) -> Bool
+    func attributeForName(_ name: String) -> String?
+    func attributeForName(_ name: String, className: String) -> Any?
+    func setAttribute(_ name: String, value: Any)
+    func removeAttribute(_ name: String)
     
     var body: String { get set }
-    var bodyContent: String { get }
+    var bodyContent: String { get set }
     
 }
 
 extension JSValue: ItemType {
 
+    public static func getCommonAncestors(_ items: [ItemType]) -> [ItemType] {
+        return BirchOutline.sharedContext.jsItemClass.invokeMethod("getCommonAncestors", withArguments: [items]).toItemTypeArray()
+    }
+
+    public var jsOutline: JSValue {
+        return forProperty("outline")
+    }
+
     public var id: String {
-        return valueForProperty("id").toString()
+        return forProperty("id").toString()
     }
 
     public var parent: ItemType? {
-        return valueForProperty("parent").selfOrNil()
+        return forProperty("parent").selfOrNil()
     }
 
     public var firstChild: ItemType? {
-        return valueForProperty("firstChild").selfOrNil()
+        return forProperty("firstChild").selfOrNil()
     }
 
     public var lastChild: ItemType? {
-        return valueForProperty("lastChild").selfOrNil()
+        return forProperty("lastChild").selfOrNil()
     }
 
     public var previousSibling: ItemType? {
-        return valueForProperty("previousSibling").selfOrNil()
+        return forProperty("previousSibling").selfOrNil()
     }
 
     public var nextSibling: ItemType? {
-        return valueForProperty("nextSibling").selfOrNil()
+        return forProperty("nextSibling").selfOrNil()
     }
     
     public var children: [ItemType] {
-        return valueForProperty("children").toItemTypeArray() 
+        return forProperty("children").toItemTypeArray() 
+    }
+
+    public var descendants: [ItemType] {
+        return forProperty("descendants").toItemTypeArray()
     }
     
-    public func contains(item: ItemType) -> Bool {
+    public func contains(_ item: ItemType) -> Bool {
         return invokeMethod("contains", withArguments: [item]).toBool()
     }
 
-    public func insertChildren(children: [ItemType], beforeSibling: ItemType?) {
-        let mapped: [AnyObject] = children.map { $0 }
+    public func insertChildren(_ children: [ItemType], beforeSibling: ItemType?) {
+        let mapped: [Any] = children.map { $0 }
         if let beforeSibling = beforeSibling {
             invokeMethod("insertChildrenBefore", withArguments: [mapped, beforeSibling])
         } else {
@@ -81,13 +97,13 @@ extension JSValue: ItemType {
         }
     }
 
-    public func appendChildren(children: [ItemType]) {
-        let mapped: [AnyObject] = children.map { $0 }
+    public func appendChildren(_ children: [ItemType]) {
+        let mapped: [Any] = children.map { $0 }
         invokeMethod("appendChildren", withArguments: [mapped])
     }
     
-    public func removeChildren(children: [ItemType]) {
-        let mapped: [AnyObject] = children.map { $0 }
+    public func removeChildren(_ children: [ItemType]) {
+        let mapped: [Any] = children.map { $0 }
         invokeMethod("removeChildren", withArguments: [mapped])
     }
     
@@ -96,24 +112,32 @@ extension JSValue: ItemType {
     }
     
     public var attributes: [String:String] {
-        return valueForProperty("attributes").toDictionary() as? [String:String] ?? [:]
+        return forProperty("attributes").toDictionary() as? [String:String] ?? [:]
     }
     
-    public func hasAttribute(name: String) -> Bool {
+    public func hasAttribute(_ name: String) -> Bool {
         return invokeMethod("hasAttribute", withArguments: [name]).toBool()
     }
     
-    public func attributeForName(name: String) -> String? {
+    public func attributeForName(_ name: String) -> String? {
         return invokeMethod("getAttribute", withArguments: [name]).selfOrNil()?.toString()
     }
 
-    public func setAttribute(name: String, value: AnyObject) {
+    public func attributeForName(_ name: String, className: String) -> Any? {
+        return invokeMethod("getAttribute", withArguments: [name, className]).selfOrNil()?.toObject()
+    }
+
+    public func setAttribute(_ name: String, value: Any) {
         invokeMethod("setAttribute", withArguments: [name, value])
     }
     
+    public func removeAttribute(_ name: String) {
+        invokeMethod("removeAttribute", withArguments: [name])
+    }
+
     public var body: String {
         get {
-            return valueForProperty("bodyString").toString()
+            return forProperty("bodyString").toString()
         }
         set (value) {
             setValue(value, forProperty: "bodyString")
@@ -121,7 +145,12 @@ extension JSValue: ItemType {
     }
     
     public var bodyContent: String {
-        return valueForProperty("bodyContentString").toString()
+        get {
+            return forProperty("bodyContentString").toString()
+        }
+        set (value) {
+            return setValue(value, forProperty: "bodyContentString")
+        }
     }
     
 }

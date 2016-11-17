@@ -18,6 +18,8 @@
 		4318528E1D3488B90049BBB0 /* ObjC.h in Headers */ = {isa = PBXBuildFile; fileRef = 4318528B1D3488B90049BBB0 /* ObjC.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4318528F1D3488B90049BBB0 /* ObjC.m in Sources */ = {isa = PBXBuildFile; fileRef = 4318528C1D3488B90049BBB0 /* ObjC.m */; };
 		431852901D3488B90049BBB0 /* ObjC.m in Sources */ = {isa = PBXBuildFile; fileRef = 4318528C1D3488B90049BBB0 /* ObjC.m */; };
+		433815D61DB69F5700120078 /* DateTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 433815D51DB69F5700120078 /* DateTime.swift */; };
+		433815D71DB69F5700120078 /* DateTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 433815D51DB69F5700120078 /* DateTime.swift */; };
 		435A3C011D38292F00E05ED5 /* OutlineFixture.bml in Resources */ = {isa = PBXBuildFile; fileRef = 435A3BFF1D38292F00E05ED5 /* OutlineFixture.bml */; };
 		435A3C021D38292F00E05ED5 /* OutlineFixture.bml in Resources */ = {isa = PBXBuildFile; fileRef = 435A3BFF1D38292F00E05ED5 /* OutlineFixture.bml */; };
 		435A3C031D38292F00E05ED5 /* OutlineFixture.txt in Resources */ = {isa = PBXBuildFile; fileRef = 435A3C001D38292F00E05ED5 /* OutlineFixture.txt */; };
@@ -44,6 +46,8 @@
 		436C0DF01D1D65230089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
 		436C0DF11D1D65240089FA7A /* OutlineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */; };
 		4391F82D1D4FEFEA00ED3CF9 /* MutationType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4300222A1D4435AA00E7908D /* MutationType.swift */; };
+		43B6ADB41D6BA78100ACA66C /* JSContext-GarbageCollection.h in Headers */ = {isa = PBXBuildFile; fileRef = 43B6ADB21D6BA78100ACA66C /* JSContext-GarbageCollection.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		43B6ADB51D6BA78100ACA66C /* JSContext-GarbageCollection.m in Sources */ = {isa = PBXBuildFile; fileRef = 43B6ADB31D6BA78100ACA66C /* JSContext-GarbageCollection.m */; };
 		43E6193E1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
 		43E6193F1D2340B3001E3F4D /* String-Localize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E6193D1D2340B3001E3F4D /* String-Localize.swift */; };
 		43E619501D244344001E3F4D /* birchoutline.js in Resources */ = {isa = PBXBuildFile; fileRef = 43E6194F1D244344001E3F4D /* birchoutline.js */; };
@@ -74,6 +78,7 @@
 		4318526B1D32C7C60049BBB0 /* String-Path.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Path.swift"; sourceTree = "<group>"; };
 		4318528B1D3488B90049BBB0 /* ObjC.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjC.h; sourceTree = "<group>"; };
 		4318528C1D3488B90049BBB0 /* ObjC.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ObjC.m; sourceTree = "<group>"; };
+		433815D51DB69F5700120078 /* DateTime.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DateTime.swift; sourceTree = "<group>"; };
 		435A3BFF1D38292F00E05ED5 /* OutlineFixture.bml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = OutlineFixture.bml; sourceTree = "<group>"; };
 		435A3C001D38292F00E05ED5 /* OutlineFixture.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = OutlineFixture.txt; sourceTree = "<group>"; };
 		436A90C21D2D7C630082CF46 /* DisposableType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DisposableType.swift; sourceTree = "<group>"; };
@@ -95,6 +100,8 @@
 		436C0DD91D1D64CC0089FA7A /* ItemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemTests.swift; sourceTree = "<group>"; };
 		436C0DDA1D1D64CC0089FA7A /* JavaScriptContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JavaScriptContextTests.swift; sourceTree = "<group>"; };
 		436C0DDD1D1D64CC0089FA7A /* OutlineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineTests.swift; sourceTree = "<group>"; };
+		43B6ADB21D6BA78100ACA66C /* JSContext-GarbageCollection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "JSContext-GarbageCollection.h"; sourceTree = "<group>"; };
+		43B6ADB31D6BA78100ACA66C /* JSContext-GarbageCollection.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "JSContext-GarbageCollection.m"; sourceTree = "<group>"; };
 		43E6193D1D2340B3001E3F4D /* String-Localize.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String-Localize.swift"; sourceTree = "<group>"; };
 		43E6194F1D244344001E3F4D /* birchoutline.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = birchoutline.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -251,6 +258,7 @@
 		436C0DFA1D1D65DD0089FA7A /* Outline */ = {
 			isa = PBXGroup;
 			children = (
+				433815D51DB69F5700120078 /* DateTime.swift */,
 				436C0DD31D1D64CC0089FA7A /* ItemType.swift */,
 				436C0DD71D1D64CC0089FA7A /* OutlineType.swift */,
 				4300222A1D4435AA00E7908D /* MutationType.swift */,
@@ -268,6 +276,8 @@
 				4318526B1D32C7C60049BBB0 /* String-Path.swift */,
 				4318528B1D3488B90049BBB0 /* ObjC.h */,
 				4318528C1D3488B90049BBB0 /* ObjC.m */,
+				43B6ADB21D6BA78100ACA66C /* JSContext-GarbageCollection.h */,
+				43B6ADB31D6BA78100ACA66C /* JSContext-GarbageCollection.m */,
 			);
 			name = Extensions;
 			sourceTree = "<group>";
@@ -289,6 +299,7 @@
 			files = (
 				4318528D1D3488B90049BBB0 /* ObjC.h in Headers */,
 				436C0D741D1D56D50089FA7A /* BirchOutline.h in Headers */,
+				43B6ADB41D6BA78100ACA66C /* JSContext-GarbageCollection.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -308,10 +319,10 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 436C0D841D1D56D50089FA7A /* Build configuration list for PBXNativeTarget "BirchOutline" */;
 			buildPhases = (
-				43E619471D243A97001E3F4D /* Copy birchoutline.js if present and changed */,
 				436C0D6B1D1D56D50089FA7A /* Sources */,
 				436C0D6C1D1D56D50089FA7A /* Frameworks */,
 				436C0D6D1D1D56D50089FA7A /* Headers */,
+				43E619471D243A97001E3F4D /* Import birchoutline.js dependency if present and changed */,
 				436C0D6E1D1D56D50089FA7A /* Resources */,
 			);
 			buildRules = (
@@ -384,20 +395,24 @@
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 0730;
-				LastUpgradeCheck = 0730;
+				LastUpgradeCheck = 0800;
 				ORGANIZATIONNAME = "Jesse Grosjean";
 				TargetAttributes = {
 					436C0D6F1D1D56D50089FA7A = {
 						CreatedOnToolsVersion = 7.3.1;
+						LastSwiftMigration = 0800;
 					};
 					436C0D791D1D56D50089FA7A = {
 						CreatedOnToolsVersion = 7.3.1;
+						LastSwiftMigration = 0800;
 					};
 					436C0DB11D1D63630089FA7A = {
 						CreatedOnToolsVersion = 7.3.1;
+						LastSwiftMigration = 0800;
 					};
 					436C0DBA1D1D63630089FA7A = {
 						CreatedOnToolsVersion = 7.3.1;
+						LastSwiftMigration = 0800;
 					};
 				};
 			};
@@ -459,21 +474,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		43E619471D243A97001E3F4D /* Copy birchoutline.js if present and changed */ = {
+		43E619471D243A97001E3F4D /* Import birchoutline.js dependency if present and changed */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/../birch-outline/min/birchoutline.js",
+				"$(SRCROOT)/../birch-outline.js/min/birchoutline.js",
 			);
-			name = "Copy birchoutline.js if present and changed";
+			name = "Import birchoutline.js dependency if present and changed";
 			outputPaths = (
 				"$(SRCROOT)/Dependencies/birchoutline.js",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"jesse is here\"\n\nif [ -f $SCRIPT_INPUT_FILE_0 ]\nthen\n cp \"${SCRIPT_INPUT_FILE_0}\" \"${SCRIPT_OUTPUT_FILE_0}\"\nfi";
+			shellScript = "if [ -f $SCRIPT_INPUT_FILE_0 ]\nthen\n  cp \"${SCRIPT_INPUT_FILE_0}\" \"${SCRIPT_OUTPUT_FILE_0}\"\nfi";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -489,10 +504,12 @@
 				436A90C31D2D7C630082CF46 /* DisposableType.swift in Sources */,
 				436C0DE41D1D650C0089FA7A /* BirchScriptContext.swift in Sources */,
 				4318528F1D3488B90049BBB0 /* ObjC.m in Sources */,
+				43B6ADB51D6BA78100ACA66C /* JSContext-GarbageCollection.m in Sources */,
 				436C0DE21D1D65090089FA7A /* ItemType.swift in Sources */,
 				431852681D32A8DE0049BBB0 /* BirchCrossPlatform.swift in Sources */,
 				436C0DE61D1D650F0089FA7A /* JSValue.swift in Sources */,
 				436C0DDE1D1D64D30089FA7A /* BirchOutline.swift in Sources */,
+				433815D61DB69F5700120078 /* DateTime.swift in Sources */,
 				4300222B1D4435AA00E7908D /* MutationType.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -521,6 +538,7 @@
 				436C0DE31D1D65090089FA7A /* ItemType.swift in Sources */,
 				436C0DE71D1D65100089FA7A /* JSValue.swift in Sources */,
 				436C0DDF1D1D64D40089FA7A /* BirchOutline.swift in Sources */,
+				433815D71DB69F5700120078 /* DateTime.swift in Sources */,
 				4391F82D1D4FEFEA00ED3CF9 /* MutationType.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -565,8 +583,10 @@
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
@@ -614,8 +634,10 @@
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_EMPTY_BODY = YES;
 				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_IDENTITY = "-";
@@ -645,6 +667,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -658,6 +681,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutline;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 3.0;
 			};
 			name = Debug;
 		};
@@ -665,6 +689,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -678,6 +703,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutline;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 3.0;
 			};
 			name = Release;
 		};
@@ -689,6 +715,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutlineTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 3.0;
 			};
 			name = Debug;
 		};
@@ -700,6 +727,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutlineTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 3.0;
 			};
 			name = Release;
 		};
@@ -707,7 +735,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 3;
@@ -720,6 +748,7 @@
 				PRODUCT_NAME = BirchOutline;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 3.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -728,7 +757,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 3;
@@ -741,6 +770,7 @@
 				PRODUCT_NAME = BirchOutline;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 3.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -756,6 +786,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutlineiOSTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_VERSION = 3.0;
 			};
 			name = Debug;
 		};
@@ -769,6 +800,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.hogbaysoftware.BirchOutlineiOSTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_VERSION = 3.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

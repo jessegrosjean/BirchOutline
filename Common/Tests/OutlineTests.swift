@@ -13,16 +13,19 @@ import JavaScriptCore
 class OutlineTests: XCTestCase {
 
     var outline: OutlineType!
+    weak var weakOutline: OutlineType?
     
     override func setUp() {
         super.setUp()
-        let path = NSBundle(forClass: BirchScriptContext.self).pathForResource("OutlineFixture", ofType: "txt")!
-        let textContents = try! NSString(contentsOfFile: path, encoding: NSUTF8StringEncoding)
+        let path = Bundle(for: BirchScriptContext.self).path(forResource: "OutlineFixture", ofType: "txt")!
+        let textContents = try! NSString(contentsOfFile: path, encoding: String.Encoding.utf8.rawValue)
         outline = BirchOutline.createTaskPaperOutline(textContents as String)
+        weakOutline = outline
     }
     
     override func tearDown() {
         outline = nil
+        XCTAssertNil(weakOutline)
     }
 
     func testInit() {
@@ -62,7 +65,7 @@ class OutlineTests: XCTestCase {
 
     func testOnDidUpdateChangeCountDone() {
         let disposable = outline.onDidUpdateChangeCount { changeType in
-            XCTAssertEqual(changeType, ChangeKind.Done)
+            XCTAssertEqual(changeType, .done)
         }
         outline.root.firstChild!.body = "moose"
         disposable.dispose()
@@ -71,7 +74,7 @@ class OutlineTests: XCTestCase {
     func testOnDidUpdateChangeCountUndone() {
         outline.root.firstChild!.body = "moose"
         let disposable = outline.onDidUpdateChangeCount { changeType in
-            XCTAssertEqual(changeType, ChangeKind.Undone)
+            XCTAssertEqual(changeType, .undone)
         }
         outline.undo()
         disposable.dispose()

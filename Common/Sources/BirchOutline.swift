@@ -6,15 +6,29 @@
 //  Copyright © 2016 Jesse Grosjean. All rights reserved.
 //
 
-public class BirchOutline {
+open class BirchOutline {
 
-    public static var sharedContext = BirchScriptContext()
+    static var _sharedContext: BirchScriptContext!
+    
+    open static var sharedContext: BirchScriptContext {
+        set {
+            _sharedContext = newValue
+        }
+        get {
+            if let context = _sharedContext {
+                return context
+            } else {
+                _sharedContext = BirchScriptContext()
+                return _sharedContext!
+            }
+        }
+    }
 
-    public static func createOutline(type: String?, content: String?) -> OutlineType {
+    open static func createOutline(_ type: String?, content: String?) -> OutlineType {
         return sharedContext.createOutline(type, content: content)
     }
     
-    public static func createTaskPaperOutline(content: String?) -> OutlineType {
+    open static func createTaskPaperOutline(_ content: String?) -> OutlineType {
         return sharedContext.createTaskPaperOutline(content)
     }
     

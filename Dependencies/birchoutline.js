@@ -49,16 +49,16 @@ var birchoutline =
 	  Birch: __webpack_require__(1),
 	  Outline: __webpack_require__(2),
 	  Item: __webpack_require__(75),
-	  Mutation: __webpack_require__(183),
+	  Mutation: __webpack_require__(188),
 	  ItemSerializer: __webpack_require__(73),
-	  ItemPath: __webpack_require__(181),
-	  DateTime: __webpack_require__(76),
+	  ItemPath: __webpack_require__(186),
+	  DateTime: __webpack_require__(77),
 	  AttributedString: __webpack_require__(7),
-	  Extensions: __webpack_require__(198),
-	  ItemPathQuery: __webpack_require__(199),
+	  Extensions: __webpack_require__(205),
+	  ItemPathQuery: __webpack_require__(206),
 	  SpanBuffer: __webpack_require__(10),
 	  Span: __webpack_require__(13),
-	  shortid: __webpack_require__(193),
+	  shortid: __webpack_require__(200),
 	  util: __webpack_require__(9)
 	};
 
@@ -85,13 +85,13 @@ var birchoutline =
 	
 	ItemSerializer = __webpack_require__(73);
 	
-	UndoManager = __webpack_require__(192);
+	UndoManager = __webpack_require__(199);
 	
-	ItemPath = __webpack_require__(181);
+	ItemPath = __webpack_require__(186);
 	
-	Mutation = __webpack_require__(183);
+	Mutation = __webpack_require__(188);
 	
-	shortid = __webpack_require__(193);
+	shortid = __webpack_require__(200);
 	
 	_ = __webpack_require__(14);
 	
@@ -103,6 +103,8 @@ var birchoutline =
 	
 	Outline = (function() {
 	  Outline.prototype.type = null;
+	
+	  Outline.prototype.metadata = null;
 	
 	  Outline.prototype.idsToItems = null;
 	
@@ -132,7 +134,9 @@ var birchoutline =
 	  function Outline(type, serialization) {
 	    var ref1, undoManager;
 	    this.id = shortid();
+	    this.metadata = new Map();
 	    this.idsToItems = new Map();
+	    this.branchContentIDsToItems = null;
 	    this.type = type != null ? type : ItemSerializer.TEXTType;
 	    this.root = this.createItem('', Birch.RootID);
 	    this.root.isInOutline = true;
@@ -170,7 +174,9 @@ var birchoutline =
 	        return _this.breakUndoCoalescing();
 	      };
 	    })(this)));
-	    this.reloadSerialization(serialization);
+	    if (serialization) {
+	      this.reloadSerialization(serialization);
+	    }
 	  }
 	
 	  Outline.createTaskPaperOutline = function(content) {
@@ -178,11 +184,15 @@ var birchoutline =
 	  };
 	
 	  Outline.prototype.destroy = function() {
-	    var ref1;
+	    var ref1, ref2;
 	    if (!this.destroyed) {
 	      if ((ref1 = this.undoSubscriptions) != null) {
 	        ref1.dispose();
 	      }
+	      if ((ref2 = this.undoManager) != null) {
+	        ref2.removeAllActions();
+	      }
+	      this.undoManager.disableUndoRegistration();
 	      this.destroyed = true;
 	      return this.emitter.emit('did-destroy');
 	    }
@@ -269,6 +279,57 @@ var birchoutline =
 	
 	
 	  /*
+	  Section: Metadata
+	   */
+	
+	  Outline.prototype.getMetadata = function(key) {
+	    return this.metadata.get(key);
+	  };
+	
+	  Outline.prototype.setMetadata = function(key, value) {
+	    var e;
+	    if (value) {
+	      try {
+	        JSON.stringify(value);
+	        this.metadata.set(key, value);
+	      } catch (error) {
+	        e = error;
+	        console.log("value: " + value + " not JSON serializable " + e);
+	      }
+	    } else {
+	      this.metadata["delete"](key);
+	    }
+	    return this.updateChangeCount(Outline.ChangeDone);
+	  };
+	
+	  Outline.prototype.serializedMetadata = null;
+	
+	  Object.defineProperty(Outline.prototype, 'serializedMetadata', {
+	    get: function() {
+	      var metadata;
+	      metadata = {};
+	      this.metadata.forEach(function(value, key) {
+	        return metadata[key] = value;
+	      });
+	      return JSON.stringify(metadata);
+	    },
+	    set: function(jsonMetadata) {
+	      var each, i, len, metadata, ref1, results;
+	      if (metadata = JSON.parse(jsonMetadata)) {
+	        this.metadata = new Map();
+	        ref1 = Object.keys(metadata);
+	        results = [];
+	        for (i = 0, len = ref1.length; i < len; i++) {
+	          each = ref1[i];
+	          results.push(this.setMetadata(each, metadata[each]));
+	        }
+	        return results;
+	      }
+	    }
+	  });
+	
+	
+	  /*
 	  Section: Events
 	   */
 	
@@ -290,6 +351,14 @@ var birchoutline =
 	
 	  Outline.prototype.onDidUpdateChangeCount = function(callback) {
 	    return this.emitter.on('did-update-change-count', callback);
+	  };
+	
+	  Outline.prototype.onWillReload = function(callback) {
+	    return this.emitter.on('will-reload', callback);
+	  };
+	
+	  Outline.prototype.onDidReload = function(callback) {
+	    return this.emitter.on('did-reload', callback);
 	  };
 	
 	  Outline.prototype.onDidDestroy = function(callback) {
@@ -344,6 +413,21 @@ var birchoutline =
 	    }
 	    return items;
 	  };
+	
+	  Outline.prototype.getItemForBranchContentID = function(contentID) {
+	    var each, i, len, ref1;
+	    if (!this.branchContentIDsToItems) {
+	      this.branchContentIDsToItems = new Map();
+	      ref1 = this.root.descendants;
+	      for (i = 0, len = ref1.length; i < len; i++) {
+	        each = ref1[i];
+	        this.branchContentIDsToItems.set(each.branchContentID, each);
+	      }
+	    }
+	    return this.branchContentIDsToItems.get(contentID);
+	  };
+	
+	  Outline.prototype.getItemForFuzzyContentID = function(fuzzyContentID) {};
 	
 	  Outline.prototype.getAttributeNames = function(autoIncludeAttributes, excludeAttributes) {
 	    var attributes, attributesArray, each, eachAttributeName, i, j, k, len, len1, len2, ref1, ref2;
@@ -606,7 +690,6 @@ var birchoutline =
 	        reinsertChildren.push(each);
 	      }
 	    }
-	    Item.removeItemsFromParents(reinsertChildren);
 	    Item.removeItemsFromParents(items);
 	    return this.insertItemsBefore(reinsertChildren, insertBefore);
 	  };
@@ -714,6 +797,7 @@ var birchoutline =
 	    }
 	    this.changingCount--;
 	    if (this.changingCount === 0) {
+	      this.branchContentIDsToItems = null;
 	      this.emitter.emit('did-end-changes', this.changes);
 	      changesCallbacks = this.changesCallbacks;
 	      this.changesCallbacks = null;
@@ -769,6 +853,20 @@ var birchoutline =
 	  Section: Serialization
 	   */
 	
+	  Outline.prototype.serializeItems = function(items, options) {
+	    if (options == null) {
+	      options = {};
+	    }
+	    return ItemSerializer.serializeItems(items, options);
+	  };
+	
+	  Outline.prototype.deserializeItems = function(serializedItems, options) {
+	    if (options == null) {
+	      options = {};
+	    }
+	    return ItemSerializer.deserializeItems(serializedItems, this, options);
+	  };
+	
 	  Outline.prototype.serialize = function(options) {
 	    if (options == null) {
 	      options = {};
@@ -783,11 +881,13 @@ var birchoutline =
 	    if (options == null) {
 	      options = {};
 	    }
-	    if (serialization) {
+	    if (serialization != null) {
 	      if (options['type'] == null) {
 	        options['type'] = this.type;
 	      }
 	      this.emitter.emit('will-reload');
+	      this.undoManager.removeAllActions();
+	      this.undoManager.disableUndoRegistration();
 	      this.groupChanges((function(_this) {
 	        return function() {
 	          var items;
@@ -796,6 +896,7 @@ var birchoutline =
 	          return _this.root.appendChildren(items);
 	        };
 	      })(this));
+	      this.undoManager.enableUndoRegistration();
 	      this.updateChangeCount(Outline.ChangeCleared);
 	      return this.emitter.emit('did-reload');
 	    }
@@ -974,7 +1075,11 @@ var birchoutline =
 	            newHandlers.push(handler);
 	          }
 	        }
-	        this.handlersByEventName[eventName] = newHandlers;
+	        if (newHandlers.length > 0) {
+	          this.handlersByEventName[eventName] = newHandlers;
+	        } else {
+	          delete this.handlersByEventName[eventName];
+	        }
 	      }
 	    };
 	
@@ -991,6 +1096,26 @@ var birchoutline =
 	          this.constructor.dispatch(handler, value);
 	        }
 	      }
+	    };
+	
+	    Emitter.prototype.getEventNames = function() {
+	      return Object.keys(this.handlersByEventName);
+	    };
+	
+	    Emitter.prototype.listenerCountForEventName = function(eventName) {
+	      var _ref, _ref1;
+	      return (_ref = (_ref1 = this.handlersByEventName[eventName]) != null ? _ref1.length : void 0) != null ? _ref : 0;
+	    };
+	
+	    Emitter.prototype.getTotalListenerCount = function() {
+	      var eventName, result, _i, _len, _ref;
+	      result = 0;
+	      _ref = Object.keys(this.handlersByEventName);
+	      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+	        eventName = _ref[_i];
+	        result += this.handlersByEventName[eventName].length;
+	      }
+	      return result;
 	    };
 	
 	    return Emitter;
@@ -1042,10 +1167,12 @@ var birchoutline =
 
 /***/ },
 /* 6 */
-/***/ function(module, exports) {
+/***/ function(module, exports, __webpack_require__) {
 
 	(function() {
-	  var CompositeDisposable;
+	  var CompositeDisposable, Disposable, assertDisposable;
+	
+	  Disposable = null;
 	
 	  module.exports = CompositeDisposable = (function() {
 	    CompositeDisposable.prototype.disposed = false;
@@ -1082,8 +1209,9 @@ var birchoutline =
 	    CompositeDisposable.prototype.add = function() {
 	      var disposable, _i, _len;
 	      if (!this.disposed) {
-	        for (_i = 0, _len = arguments.length; _i < _len; _i++) {
+	        for (_i = 0, _len = arguments.length; _i < _len; _i += 1) {
 	          disposable = arguments[_i];
+	          assertDisposable(disposable);
 	          this.disposables.add(disposable);
 	        }
 	      }
@@ -1104,6 +1232,15 @@ var birchoutline =
 	    return CompositeDisposable;
 	
 	  })();
+	
+	  assertDisposable = function(disposable) {
+	    if (Disposable == null) {
+	      Disposable = __webpack_require__(5);
+	    }
+	    if (!Disposable.isDisposable(disposable)) {
+	      throw new TypeError('Arguments to CompositeDisposable.add must have a .dispose() method');
+	    }
+	  };
 	
 	}).call(this);
 
@@ -3178,7 +3315,6 @@ var birchoutline =
 /***/ function(module, exports) {
 
 	// shim for using process in browser
-	
 	var process = module.exports = {};
 	
 	// cached from whatever global is present so that test runners that stub it
@@ -3190,21 +3326,63 @@ var birchoutline =
 	var cachedClearTimeout;
 	
 	(function () {
-	  try {
-	    cachedSetTimeout = setTimeout;
-	  } catch (e) {
-	    cachedSetTimeout = function () {
-	      throw new Error('setTimeout is not defined');
+	    try {
+	        cachedSetTimeout = setTimeout;
+	    } catch (e) {
+	        cachedSetTimeout = function () {
+	            throw new Error('setTimeout is not defined');
+	        }
 	    }
-	  }
-	  try {
-	    cachedClearTimeout = clearTimeout;
-	  } catch (e) {
-	    cachedClearTimeout = function () {
-	      throw new Error('clearTimeout is not defined');
+	    try {
+	        cachedClearTimeout = clearTimeout;
+	    } catch (e) {
+	        cachedClearTimeout = function () {
+	            throw new Error('clearTimeout is not defined');
+	        }
 	    }
-	  }
 	} ())
+	function runTimeout(fun) {
+	    if (cachedSetTimeout === setTimeout) {
+	        //normal enviroments in sane situations
+	        return setTimeout(fun, 0);
+	    }
+	    try {
+	        // when when somebody has screwed with setTimeout but no I.E. maddness
+	        return cachedSetTimeout(fun, 0);
+	    } catch(e){
+	        try {
+	            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+	            return cachedSetTimeout.call(null, fun, 0);
+	        } catch(e){
+	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+	            return cachedSetTimeout.call(this, fun, 0);
+	        }
+	    }
+	
+	
+	}
+	function runClearTimeout(marker) {
+	    if (cachedClearTimeout === clearTimeout) {
+	        //normal enviroments in sane situations
+	        return clearTimeout(marker);
+	    }
+	    try {
+	        // when when somebody has screwed with setTimeout but no I.E. maddness
+	        return cachedClearTimeout(marker);
+	    } catch (e){
+	        try {
+	            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+	            return cachedClearTimeout.call(null, marker);
+	        } catch (e){
+	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+	            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+	            return cachedClearTimeout.call(this, marker);
+	        }
+	    }
+	
+	
+	
+	}
 	var queue = [];
 	var draining = false;
 	var currentQueue;
@@ -3229,7 +3407,7 @@ var birchoutline =
 	    if (draining) {
 	        return;
 	    }
-	    var timeout = cachedSetTimeout(cleanUpNextTick);
+	    var timeout = runTimeout(cleanUpNextTick);
 	    draining = true;
 	
 	    var len = queue.length;
@@ -3246,7 +3424,7 @@ var birchoutline =
 	    }
 	    currentQueue = null;
 	    draining = false;
-	    cachedClearTimeout(timeout);
+	    runClearTimeout(timeout);
 	}
 	
 	process.nextTick = function (fun) {
@@ -3258,7 +3436,7 @@ var birchoutline =
 	    }
 	    queue.push(new Item(fun, args));
 	    if (queue.length === 1 && !draining) {
-	        cachedSetTimeout(drainQueue, 0);
+	        runTimeout(drainQueue);
 	    }
 	};
 	
@@ -6004,8 +6182,8 @@ var birchoutline =
 	Tokenizer.prototype._cleanup = function (){
 		if(this._sectionStart < 0){
 			this._buffer = "";
-			this._index = 0;
 			this._bufferOffset += this._index;
+			this._index = 0;
 		} else if(this._running){
 			if(this._state === TEXT){
 				if(this._sectionStart !== this._index){
@@ -10546,9 +10724,6 @@ var birchoutline =
 	exports.Buffer = Buffer
 	exports.SlowBuffer = SlowBuffer
 	exports.INSPECT_MAX_BYTES = 50
-	Buffer.poolSize = 8192 // not used by this implementation
-	
-	var rootParent = {}
 	
 	/**
 	 * If `Buffer.TYPED_ARRAY_SUPPORT`:
@@ -10566,9 +10741,6 @@ var birchoutline =
 	 *   - Firefox 4-29 lacks support for adding new properties to `Uint8Array` instances,
 	 *     See: https://bugzilla.mozilla.org/show_bug.cgi?id=695438.
 	 *
-	 *   - Safari 5-7 lacks support for changing the `Object.prototype.constructor` property
-	 *     on objects.
-	 *
 	 *   - Chrome 9-10 is missing the `TypedArray.prototype.subarray` function.
 	 *
 	 *   - IE10 has a broken `TypedArray.prototype.subarray` function which returns arrays of
@@ -10581,14 +10753,16 @@ var birchoutline =
 	  ? global.TYPED_ARRAY_SUPPORT
 	  : typedArraySupport()
 	
+	/*
+	 * Export kMaxLength after typed array support is determined.
+	 */
+	exports.kMaxLength = kMaxLength()
+	
 	function typedArraySupport () {
-	  function Bar () {}
 	  try {
 	    var arr = new Uint8Array(1)
-	    arr.foo = function () { return 42 }
-	    arr.constructor = Bar
+	    arr.__proto__ = {__proto__: Uint8Array.prototype, foo: function () { return 42 }}
 	    return arr.foo() === 42 && // typed array instances can be augmented
-	        arr.constructor === Bar && // constructor can be set
 	        typeof arr.subarray === 'function' && // chrome 9-10 lack `subarray`
 	        arr.subarray(1, 1).byteLength === 0 // ie10 has broken `subarray`
 	  } catch (e) {
@@ -10602,184 +10776,252 @@ var birchoutline =
 	    : 0x3fffffff
 	}
 	
-	/**
-	 * Class: Buffer
-	 * =============
-	 *
-	 * The Buffer constructor returns instances of `Uint8Array` that are augmented
-	 * with function properties for all the node `Buffer` API functions. We use
-	 * `Uint8Array` so that square bracket notation works as expected -- it returns
-	 * a single octet.
-	 *
-	 * By augmenting the instances, we can avoid modifying the `Uint8Array`
-	 * prototype.
-	 */
-	function Buffer (arg) {
-	  if (!(this instanceof Buffer)) {
-	    // Avoid going through an ArgumentsAdaptorTrampoline in the common case.
-	    if (arguments.length > 1) return new Buffer(arg, arguments[1])
-	    return new Buffer(arg)
+	function createBuffer (that, length) {
+	  if (kMaxLength() < length) {
+	    throw new RangeError('Invalid typed array length')
+	  }
+	  if (Buffer.TYPED_ARRAY_SUPPORT) {
+	    // Return an augmented `Uint8Array` instance, for best performance
+	    that = new Uint8Array(length)
+	    that.__proto__ = Buffer.prototype
+	  } else {
+	    // Fallback: Return an object instance of the Buffer class
+	    if (that === null) {
+	      that = new Buffer(length)
+	    }
+	    that.length = length
 	  }
 	
-	  if (!Buffer.TYPED_ARRAY_SUPPORT) {
-	    this.length = 0
-	    this.parent = undefined
+	  return that
+	}
+	
+	/**
+	 * The Buffer constructor returns instances of `Uint8Array` that have their
+	 * prototype changed to `Buffer.prototype`. Furthermore, `Buffer` is a subclass of
+	 * `Uint8Array`, so the returned instances will have all the node `Buffer` methods
+	 * and the `Uint8Array` methods. Square bracket notation works as expected -- it
+	 * returns a single octet.
+	 *
+	 * The `Uint8Array` prototype remains unmodified.
+	 */
+	
+	function Buffer (arg, encodingOrOffset, length) {
+	  if (!Buffer.TYPED_ARRAY_SUPPORT && !(this instanceof Buffer)) {
+	    return new Buffer(arg, encodingOrOffset, length)
 	  }
 	
 	  // Common case.
 	  if (typeof arg === 'number') {
-	    return fromNumber(this, arg)
+	    if (typeof encodingOrOffset === 'string') {
+	      throw new Error(
+	        'If encoding is specified then the first argument must be a string'
+	      )
+	    }
+	    return allocUnsafe(this, arg)
 	  }
-	
-	  // Slightly less common case.
-	  if (typeof arg === 'string') {
-	    return fromString(this, arg, arguments.length > 1 ? arguments[1] : 'utf8')
-	  }
-	
-	  // Unusual.
-	  return fromObject(this, arg)
+	  return from(this, arg, encodingOrOffset, length)
 	}
 	
-	function fromNumber (that, length) {
-	  that = allocate(that, length < 0 ? 0 : checked(length) | 0)
+	Buffer.poolSize = 8192 // not used by this implementation
+	
+	// TODO: Legacy, not needed anymore. Remove in next major version.
+	Buffer._augment = function (arr) {
+	  arr.__proto__ = Buffer.prototype
+	  return arr
+	}
+	
+	function from (that, value, encodingOrOffset, length) {
+	  if (typeof value === 'number') {
+	    throw new TypeError('"value" argument must not be a number')
+	  }
+	
+	  if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) {
+	    return fromArrayBuffer(that, value, encodingOrOffset, length)
+	  }
+	
+	  if (typeof value === 'string') {
+	    return fromString(that, value, encodingOrOffset)
+	  }
+	
+	  return fromObject(that, value)
+	}
+	
+	/**
+	 * Functionally equivalent to Buffer(arg, encoding) but throws a TypeError
+	 * if value is a number.
+	 * Buffer.from(str[, encoding])
+	 * Buffer.from(array)
+	 * Buffer.from(buffer)
+	 * Buffer.from(arrayBuffer[, byteOffset[, length]])
+	 **/
+	Buffer.from = function (value, encodingOrOffset, length) {
+	  return from(null, value, encodingOrOffset, length)
+	}
+	
+	if (Buffer.TYPED_ARRAY_SUPPORT) {
+	  Buffer.prototype.__proto__ = Uint8Array.prototype
+	  Buffer.__proto__ = Uint8Array
+	  if (typeof Symbol !== 'undefined' && Symbol.species &&
+	      Buffer[Symbol.species] === Buffer) {
+	    // Fix subarray() in ES2016. See: https://github.com/feross/buffer/pull/97
+	    Object.defineProperty(Buffer, Symbol.species, {
+	      value: null,
+	      configurable: true
+	    })
+	  }
+	}
+	
+	function assertSize (size) {
+	  if (typeof size !== 'number') {
+	    throw new TypeError('"size" argument must be a number')
+	  } else if (size < 0) {
+	    throw new RangeError('"size" argument must not be negative')
+	  }
+	}
+	
+	function alloc (that, size, fill, encoding) {
+	  assertSize(size)
+	  if (size <= 0) {
+	    return createBuffer(that, size)
+	  }
+	  if (fill !== undefined) {
+	    // Only pay attention to encoding if it's a string. This
+	    // prevents accidentally sending in a number that would
+	    // be interpretted as a start offset.
+	    return typeof encoding === 'string'
+	      ? createBuffer(that, size).fill(fill, encoding)
+	      : createBuffer(that, size).fill(fill)
+	  }
+	  return createBuffer(that, size)
+	}
+	
+	/**
+	 * Creates a new filled Buffer instance.
+	 * alloc(size[, fill[, encoding]])
+	 **/
+	Buffer.alloc = function (size, fill, encoding) {
+	  return alloc(null, size, fill, encoding)
+	}
+	
+	function allocUnsafe (that, size) {
+	  assertSize(size)
+	  that = createBuffer(that, size < 0 ? 0 : checked(size) | 0)
 	  if (!Buffer.TYPED_ARRAY_SUPPORT) {
-	    for (var i = 0; i < length; i++) {
+	    for (var i = 0; i < size; ++i) {
 	      that[i] = 0
 	    }
 	  }
 	  return that
 	}
 	
+	/**
+	 * Equivalent to Buffer(num), by default creates a non-zero-filled Buffer instance.
+	 * */
+	Buffer.allocUnsafe = function (size) {
+	  return allocUnsafe(null, size)
+	}
+	/**
+	 * Equivalent to SlowBuffer(num), by default creates a non-zero-filled Buffer instance.
+	 */
+	Buffer.allocUnsafeSlow = function (size) {
+	  return allocUnsafe(null, size)
+	}
+	
 	function fromString (that, string, encoding) {
-	  if (typeof encoding !== 'string' || encoding === '') encoding = 'utf8'
+	  if (typeof encoding !== 'string' || encoding === '') {
+	    encoding = 'utf8'
+	  }
 	
-	  // Assumption: byteLength() return value is always < kMaxLength.
+	  if (!Buffer.isEncoding(encoding)) {
+	    throw new TypeError('"encoding" must be a valid string encoding')
+	  }
+	
 	  var length = byteLength(string, encoding) | 0
-	  that = allocate(that, length)
+	  that = createBuffer(that, length)
 	
-	  that.write(string, encoding)
-	  return that
-	}
+	  var actual = that.write(string, encoding)
 	
-	function fromObject (that, object) {
-	  if (Buffer.isBuffer(object)) return fromBuffer(that, object)
-	
-	  if (isArray(object)) return fromArray(that, object)
-	
-	  if (object == null) {
-	    throw new TypeError('must start with number, buffer, array or string')
+	  if (actual !== length) {
+	    // Writing a hex string, for example, that contains invalid characters will
+	    // cause everything after the first invalid character to be ignored. (e.g.
+	    // 'abxxcd' will be treated as 'ab')
+	    that = that.slice(0, actual)
 	  }
 	
-	  if (typeof ArrayBuffer !== 'undefined') {
-	    if (object.buffer instanceof ArrayBuffer) {
-	      return fromTypedArray(that, object)
-	    }
-	    if (object instanceof ArrayBuffer) {
-	      return fromArrayBuffer(that, object)
-	    }
-	  }
-	
-	  if (object.length) return fromArrayLike(that, object)
-	
-	  return fromJsonObject(that, object)
-	}
-	
-	function fromBuffer (that, buffer) {
-	  var length = checked(buffer.length) | 0
-	  that = allocate(that, length)
-	  buffer.copy(that, 0, 0, length)
-	  return that
-	}
-	
-	function fromArray (that, array) {
-	  var length = checked(array.length) | 0
-	  that = allocate(that, length)
-	  for (var i = 0; i < length; i += 1) {
-	    that[i] = array[i] & 255
-	  }
-	  return that
-	}
-	
-	// Duplicate of fromArray() to keep fromArray() monomorphic.
-	function fromTypedArray (that, array) {
-	  var length = checked(array.length) | 0
-	  that = allocate(that, length)
-	  // Truncating the elements is probably not what people expect from typed
-	  // arrays with BYTES_PER_ELEMENT > 1 but it's compatible with the behavior
-	  // of the old Buffer constructor.
-	  for (var i = 0; i < length; i += 1) {
-	    that[i] = array[i] & 255
-	  }
-	  return that
-	}
-	
-	function fromArrayBuffer (that, array) {
-	  if (Buffer.TYPED_ARRAY_SUPPORT) {
-	    // Return an augmented `Uint8Array` instance, for best performance
-	    array.byteLength
-	    that = Buffer._augment(new Uint8Array(array))
-	  } else {
-	    // Fallback: Return an object instance of the Buffer class
-	    that = fromTypedArray(that, new Uint8Array(array))
-	  }
 	  return that
 	}
 	
 	function fromArrayLike (that, array) {
-	  var length = checked(array.length) | 0
-	  that = allocate(that, length)
+	  var length = array.length < 0 ? 0 : checked(array.length) | 0
+	  that = createBuffer(that, length)
 	  for (var i = 0; i < length; i += 1) {
 	    that[i] = array[i] & 255
 	  }
 	  return that
 	}
 	
-	// Deserialize { type: 'Buffer', data: [1,2,3,...] } into a Buffer object.
-	// Returns a zero-length buffer for inputs that don't conform to the spec.
-	function fromJsonObject (that, object) {
-	  var array
-	  var length = 0
+	function fromArrayBuffer (that, array, byteOffset, length) {
+	  array.byteLength // this throws if `array` is not a valid ArrayBuffer
 	
-	  if (object.type === 'Buffer' && isArray(object.data)) {
-	    array = object.data
-	    length = checked(array.length) | 0
+	  if (byteOffset < 0 || array.byteLength < byteOffset) {
+	    throw new RangeError('\'offset\' is out of bounds')
 	  }
-	  that = allocate(that, length)
 	
-	  for (var i = 0; i < length; i += 1) {
-	    that[i] = array[i] & 255
+	  if (array.byteLength < byteOffset + (length || 0)) {
+	    throw new RangeError('\'length\' is out of bounds')
 	  }
-	  return that
-	}
 	
-	if (Buffer.TYPED_ARRAY_SUPPORT) {
-	  Buffer.prototype.__proto__ = Uint8Array.prototype
-	  Buffer.__proto__ = Uint8Array
-	} else {
-	  // pre-set for values that may exist in the future
-	  Buffer.prototype.length = undefined
-	  Buffer.prototype.parent = undefined
-	}
+	  if (byteOffset === undefined && length === undefined) {
+	    array = new Uint8Array(array)
+	  } else if (length === undefined) {
+	    array = new Uint8Array(array, byteOffset)
+	  } else {
+	    array = new Uint8Array(array, byteOffset, length)
+	  }
 	
-	function allocate (that, length) {
 	  if (Buffer.TYPED_ARRAY_SUPPORT) {
 	    // Return an augmented `Uint8Array` instance, for best performance
-	    that = Buffer._augment(new Uint8Array(length))
+	    that = array
 	    that.__proto__ = Buffer.prototype
 	  } else {
 	    // Fallback: Return an object instance of the Buffer class
-	    that.length = length
-	    that._isBuffer = true
+	    that = fromArrayLike(that, array)
 	  }
-	
-	  var fromPool = length !== 0 && length <= Buffer.poolSize >>> 1
-	  if (fromPool) that.parent = rootParent
-	
 	  return that
 	}
 	
+	function fromObject (that, obj) {
+	  if (Buffer.isBuffer(obj)) {
+	    var len = checked(obj.length) | 0
+	    that = createBuffer(that, len)
+	
+	    if (that.length === 0) {
+	      return that
+	    }
+	
+	    obj.copy(that, 0, 0, len)
+	    return that
+	  }
+	
+	  if (obj) {
+	    if ((typeof ArrayBuffer !== 'undefined' &&
+	        obj.buffer instanceof ArrayBuffer) || 'length' in obj) {
+	      if (typeof obj.length !== 'number' || isnan(obj.length)) {
+	        return createBuffer(that, 0)
+	      }
+	      return fromArrayLike(that, obj)
+	    }
+	
+	    if (obj.type === 'Buffer' && isArray(obj.data)) {
+	      return fromArrayLike(that, obj.data)
+	    }
+	  }
+	
+	  throw new TypeError('First argument must be a string, Buffer, ArrayBuffer, Array, or array-like object.')
+	}
+	
 	function checked (length) {
-	  // Note: cannot use `length < kMaxLength` here because that fails when
+	  // Note: cannot use `length < kMaxLength()` here because that fails when
 	  // length is NaN (which is otherwise coerced to zero.)
 	  if (length >= kMaxLength()) {
 	    throw new RangeError('Attempt to allocate Buffer larger than maximum ' +
@@ -10788,12 +11030,11 @@ var birchoutline =
 	  return length | 0
 	}
 	
-	function SlowBuffer (subject, encoding) {
-	  if (!(this instanceof SlowBuffer)) return new SlowBuffer(subject, encoding)
-	
-	  var buf = new Buffer(subject, encoding)
-	  delete buf.parent
-	  return buf
+	function SlowBuffer (length) {
+	  if (+length != length) { // eslint-disable-line eqeqeq
+	    length = 0
+	  }
+	  return Buffer.alloc(+length)
 	}
 	
 	Buffer.isBuffer = function isBuffer (b) {
@@ -10810,17 +11051,12 @@ var birchoutline =
 	  var x = a.length
 	  var y = b.length
 	
-	  var i = 0
-	  var len = Math.min(x, y)
-	  while (i < len) {
-	    if (a[i] !== b[i]) break
-	
-	    ++i
-	  }
-	
-	  if (i !== len) {
-	    x = a[i]
-	    y = b[i]
+	  for (var i = 0, len = Math.min(x, y); i < len; ++i) {
+	    if (a[i] !== b[i]) {
+	      x = a[i]
+	      y = b[i]
+	      break
+	    }
 	  }
 	
 	  if (x < y) return -1
@@ -10834,9 +11070,9 @@ var birchoutline =
 	    case 'utf8':
 	    case 'utf-8':
 	    case 'ascii':
+	    case 'latin1':
 	    case 'binary':
 	    case 'base64':
-	    case 'raw':
 	    case 'ucs2':
 	    case 'ucs-2':
 	    case 'utf16le':
@@ -10848,32 +11084,46 @@ var birchoutline =
 	}
 	
 	Buffer.concat = function concat (list, length) {
-	  if (!isArray(list)) throw new TypeError('list argument must be an Array of Buffers.')
+	  if (!isArray(list)) {
+	    throw new TypeError('"list" argument must be an Array of Buffers')
+	  }
 	
 	  if (list.length === 0) {
-	    return new Buffer(0)
+	    return Buffer.alloc(0)
 	  }
 	
 	  var i
 	  if (length === undefined) {
 	    length = 0
-	    for (i = 0; i < list.length; i++) {
+	    for (i = 0; i < list.length; ++i) {
 	      length += list[i].length
 	    }
 	  }
 	
-	  var buf = new Buffer(length)
+	  var buffer = Buffer.allocUnsafe(length)
 	  var pos = 0
-	  for (i = 0; i < list.length; i++) {
-	    var item = list[i]
-	    item.copy(buf, pos)
-	    pos += item.length
+	  for (i = 0; i < list.length; ++i) {
+	    var buf = list[i]
+	    if (!Buffer.isBuffer(buf)) {
+	      throw new TypeError('"list" argument must be an Array of Buffers')
+	    }
+	    buf.copy(buffer, pos)
+	    pos += buf.length
 	  }
-	  return buf
+	  return buffer
 	}
 	
 	function byteLength (string, encoding) {
-	  if (typeof string !== 'string') string = '' + string
+	  if (Buffer.isBuffer(string)) {
+	    return string.length
+	  }
+	  if (typeof ArrayBuffer !== 'undefined' && typeof ArrayBuffer.isView === 'function' &&
+	      (ArrayBuffer.isView(string) || string instanceof ArrayBuffer)) {
+	    return string.byteLength
+	  }
+	  if (typeof string !== 'string') {
+	    string = '' + string
+	  }
 	
 	  var len = string.length
 	  if (len === 0) return 0
@@ -10883,13 +11133,12 @@ var birchoutline =
 	  for (;;) {
 	    switch (encoding) {
 	      case 'ascii':
+	      case 'latin1':
 	      case 'binary':
-	      // Deprecated
-	      case 'raw':
-	      case 'raws':
 	        return len
 	      case 'utf8':
 	      case 'utf-8':
+	      case undefined:
 	        return utf8ToBytes(string).length
 	      case 'ucs2':
 	      case 'ucs-2':
@@ -10912,13 +11161,39 @@ var birchoutline =
 	function slowToString (encoding, start, end) {
 	  var loweredCase = false
 	
-	  start = start | 0
-	  end = end === undefined || end === Infinity ? this.length : end | 0
+	  // No need to verify that "this.length <= MAX_UINT32" since it's a read-only
+	  // property of a typed array.
+	
+	  // This behaves neither like String nor Uint8Array in that we set start/end
+	  // to their upper/lower bounds if the value passed is out of range.
+	  // undefined is handled specially as per ECMA-262 6th Edition,
+	  // Section 13.3.3.7 Runtime Semantics: KeyedBindingInitialization.
+	  if (start === undefined || start < 0) {
+	    start = 0
+	  }
+	  // Return early if start > this.length. Done here to prevent potential uint32
+	  // coercion fail below.
+	  if (start > this.length) {
+	    return ''
+	  }
+	
+	  if (end === undefined || end > this.length) {
+	    end = this.length
+	  }
+	
+	  if (end <= 0) {
+	    return ''
+	  }
+	
+	  // Force coersion to uint32. This will also coerce falsey/NaN values to 0.
+	  end >>>= 0
+	  start >>>= 0
+	
+	  if (end <= start) {
+	    return ''
+	  }
 	
 	  if (!encoding) encoding = 'utf8'
-	  if (start < 0) start = 0
-	  if (end > this.length) end = this.length
-	  if (end <= start) return ''
 	
 	  while (true) {
 	    switch (encoding) {
@@ -10932,8 +11207,9 @@ var birchoutline =
 	      case 'ascii':
 	        return asciiSlice(this, start, end)
 	
+	      case 'latin1':
 	      case 'binary':
-	        return binarySlice(this, start, end)
+	        return latin1Slice(this, start, end)
 	
 	      case 'base64':
 	        return base64Slice(this, start, end)
@@ -10950,6 +11226,53 @@ var birchoutline =
 	        loweredCase = true
 	    }
 	  }
+	}
+	
+	// The property is used by `Buffer.isBuffer` and `is-buffer` (in Safari 5-7) to detect
+	// Buffer instances.
+	Buffer.prototype._isBuffer = true
+	
+	function swap (b, n, m) {
+	  var i = b[n]
+	  b[n] = b[m]
+	  b[m] = i
+	}
+	
+	Buffer.prototype.swap16 = function swap16 () {
+	  var len = this.length
+	  if (len % 2 !== 0) {
+	    throw new RangeError('Buffer size must be a multiple of 16-bits')
+	  }
+	  for (var i = 0; i < len; i += 2) {
+	    swap(this, i, i + 1)
+	  }
+	  return this
+	}
+	
+	Buffer.prototype.swap32 = function swap32 () {
+	  var len = this.length
+	  if (len % 4 !== 0) {
+	    throw new RangeError('Buffer size must be a multiple of 32-bits')
+	  }
+	  for (var i = 0; i < len; i += 4) {
+	    swap(this, i, i + 3)
+	    swap(this, i + 1, i + 2)
+	  }
+	  return this
+	}
+	
+	Buffer.prototype.swap64 = function swap64 () {
+	  var len = this.length
+	  if (len % 8 !== 0) {
+	    throw new RangeError('Buffer size must be a multiple of 64-bits')
+	  }
+	  for (var i = 0; i < len; i += 8) {
+	    swap(this, i, i + 7)
+	    swap(this, i + 1, i + 6)
+	    swap(this, i + 2, i + 5)
+	    swap(this, i + 3, i + 4)
+	  }
+	  return this
 	}
 	
 	Buffer.prototype.toString = function toString () {
@@ -10975,63 +11298,197 @@ var birchoutline =
 	  return '<Buffer ' + str + '>'
 	}
 	
-	Buffer.prototype.compare = function compare (b) {
-	  if (!Buffer.isBuffer(b)) throw new TypeError('Argument must be a Buffer')
-	  if (this === b) return 0
-	  return Buffer.compare(this, b)
+	Buffer.prototype.compare = function compare (target, start, end, thisStart, thisEnd) {
+	  if (!Buffer.isBuffer(target)) {
+	    throw new TypeError('Argument must be a Buffer')
+	  }
+	
+	  if (start === undefined) {
+	    start = 0
+	  }
+	  if (end === undefined) {
+	    end = target ? target.length : 0
+	  }
+	  if (thisStart === undefined) {
+	    thisStart = 0
+	  }
+	  if (thisEnd === undefined) {
+	    thisEnd = this.length
+	  }
+	
+	  if (start < 0 || end > target.length || thisStart < 0 || thisEnd > this.length) {
+	    throw new RangeError('out of range index')
+	  }
+	
+	  if (thisStart >= thisEnd && start >= end) {
+	    return 0
+	  }
+	  if (thisStart >= thisEnd) {
+	    return -1
+	  }
+	  if (start >= end) {
+	    return 1
+	  }
+	
+	  start >>>= 0
+	  end >>>= 0
+	  thisStart >>>= 0
+	  thisEnd >>>= 0
+	
+	  if (this === target) return 0
+	
+	  var x = thisEnd - thisStart
+	  var y = end - start
+	  var len = Math.min(x, y)
+	
+	  var thisCopy = this.slice(thisStart, thisEnd)
+	  var targetCopy = target.slice(start, end)
+	
+	  for (var i = 0; i < len; ++i) {
+	    if (thisCopy[i] !== targetCopy[i]) {
+	      x = thisCopy[i]
+	      y = targetCopy[i]
+	      break
+	    }
+	  }
+	
+	  if (x < y) return -1
+	  if (y < x) return 1
+	  return 0
 	}
 	
-	Buffer.prototype.indexOf = function indexOf (val, byteOffset) {
-	  if (byteOffset > 0x7fffffff) byteOffset = 0x7fffffff
-	  else if (byteOffset < -0x80000000) byteOffset = -0x80000000
-	  byteOffset >>= 0
+	// Finds either the first index of `val` in `buffer` at offset >= `byteOffset`,
+	// OR the last index of `val` in `buffer` at offset <= `byteOffset`.
+	//
+	// Arguments:
+	// - buffer - a Buffer to search
+	// - val - a string, Buffer, or number
+	// - byteOffset - an index into `buffer`; will be clamped to an int32
+	// - encoding - an optional encoding, relevant is val is a string
+	// - dir - true for indexOf, false for lastIndexOf
+	function bidirectionalIndexOf (buffer, val, byteOffset, encoding, dir) {
+	  // Empty buffer means no match
+	  if (buffer.length === 0) return -1
 	
-	  if (this.length === 0) return -1
-	  if (byteOffset >= this.length) return -1
+	  // Normalize byteOffset
+	  if (typeof byteOffset === 'string') {
+	    encoding = byteOffset
+	    byteOffset = 0
+	  } else if (byteOffset > 0x7fffffff) {
+	    byteOffset = 0x7fffffff
+	  } else if (byteOffset < -0x80000000) {
+	    byteOffset = -0x80000000
+	  }
+	  byteOffset = +byteOffset  // Coerce to Number.
+	  if (isNaN(byteOffset)) {
+	    // byteOffset: it it's undefined, null, NaN, "foo", etc, search whole buffer
+	    byteOffset = dir ? 0 : (buffer.length - 1)
+	  }
 	
-	  // Negative offsets start from the end of the buffer
-	  if (byteOffset < 0) byteOffset = Math.max(this.length + byteOffset, 0)
+	  // Normalize byteOffset: negative offsets start from the end of the buffer
+	  if (byteOffset < 0) byteOffset = buffer.length + byteOffset
+	  if (byteOffset >= buffer.length) {
+	    if (dir) return -1
+	    else byteOffset = buffer.length - 1
+	  } else if (byteOffset < 0) {
+	    if (dir) byteOffset = 0
+	    else return -1
+	  }
 	
+	  // Normalize val
 	  if (typeof val === 'string') {
-	    if (val.length === 0) return -1 // special case: looking for empty string always fails
-	    return String.prototype.indexOf.call(this, val, byteOffset)
-	  }
-	  if (Buffer.isBuffer(val)) {
-	    return arrayIndexOf(this, val, byteOffset)
-	  }
-	  if (typeof val === 'number') {
-	    if (Buffer.TYPED_ARRAY_SUPPORT && Uint8Array.prototype.indexOf === 'function') {
-	      return Uint8Array.prototype.indexOf.call(this, val, byteOffset)
-	    }
-	    return arrayIndexOf(this, [ val ], byteOffset)
+	    val = Buffer.from(val, encoding)
 	  }
 	
-	  function arrayIndexOf (arr, val, byteOffset) {
-	    var foundIndex = -1
-	    for (var i = 0; byteOffset + i < arr.length; i++) {
-	      if (arr[byteOffset + i] === val[foundIndex === -1 ? 0 : i - foundIndex]) {
-	        if (foundIndex === -1) foundIndex = i
-	        if (i - foundIndex + 1 === val.length) return byteOffset + foundIndex
+	  // Finally, search either indexOf (if dir is true) or lastIndexOf
+	  if (Buffer.isBuffer(val)) {
+	    // Special case: looking for empty string/buffer always fails
+	    if (val.length === 0) {
+	      return -1
+	    }
+	    return arrayIndexOf(buffer, val, byteOffset, encoding, dir)
+	  } else if (typeof val === 'number') {
+	    val = val & 0xFF // Search for a byte value [0-255]
+	    if (Buffer.TYPED_ARRAY_SUPPORT &&
+	        typeof Uint8Array.prototype.indexOf === 'function') {
+	      if (dir) {
+	        return Uint8Array.prototype.indexOf.call(buffer, val, byteOffset)
 	      } else {
-	        foundIndex = -1
+	        return Uint8Array.prototype.lastIndexOf.call(buffer, val, byteOffset)
 	      }
 	    }
-	    return -1
+	    return arrayIndexOf(buffer, [ val ], byteOffset, encoding, dir)
 	  }
 	
 	  throw new TypeError('val must be string, number or Buffer')
 	}
 	
-	// `get` is deprecated
-	Buffer.prototype.get = function get (offset) {
-	  console.log('.get() is deprecated. Access using array indexes instead.')
-	  return this.readUInt8(offset)
+	function arrayIndexOf (arr, val, byteOffset, encoding, dir) {
+	  var indexSize = 1
+	  var arrLength = arr.length
+	  var valLength = val.length
+	
+	  if (encoding !== undefined) {
+	    encoding = String(encoding).toLowerCase()
+	    if (encoding === 'ucs2' || encoding === 'ucs-2' ||
+	        encoding === 'utf16le' || encoding === 'utf-16le') {
+	      if (arr.length < 2 || val.length < 2) {
+	        return -1
+	      }
+	      indexSize = 2
+	      arrLength /= 2
+	      valLength /= 2
+	      byteOffset /= 2
+	    }
+	  }
+	
+	  function read (buf, i) {
+	    if (indexSize === 1) {
+	      return buf[i]
+	    } else {
+	      return buf.readUInt16BE(i * indexSize)
+	    }
+	  }
+	
+	  var i
+	  if (dir) {
+	    var foundIndex = -1
+	    for (i = byteOffset; i < arrLength; i++) {
+	      if (read(arr, i) === read(val, foundIndex === -1 ? 0 : i - foundIndex)) {
+	        if (foundIndex === -1) foundIndex = i
+	        if (i - foundIndex + 1 === valLength) return foundIndex * indexSize
+	      } else {
+	        if (foundIndex !== -1) i -= i - foundIndex
+	        foundIndex = -1
+	      }
+	    }
+	  } else {
+	    if (byteOffset + valLength > arrLength) byteOffset = arrLength - valLength
+	    for (i = byteOffset; i >= 0; i--) {
+	      var found = true
+	      for (var j = 0; j < valLength; j++) {
+	        if (read(arr, i + j) !== read(val, j)) {
+	          found = false
+	          break
+	        }
+	      }
+	      if (found) return i
+	    }
+	  }
+	
+	  return -1
 	}
 	
-	// `set` is deprecated
-	Buffer.prototype.set = function set (v, offset) {
-	  console.log('.set() is deprecated. Access using array indexes instead.')
-	  return this.writeUInt8(v, offset)
+	Buffer.prototype.includes = function includes (val, byteOffset, encoding) {
+	  return this.indexOf(val, byteOffset, encoding) !== -1
+	}
+	
+	Buffer.prototype.indexOf = function indexOf (val, byteOffset, encoding) {
+	  return bidirectionalIndexOf(this, val, byteOffset, encoding, true)
+	}
+	
+	Buffer.prototype.lastIndexOf = function lastIndexOf (val, byteOffset, encoding) {
+	  return bidirectionalIndexOf(this, val, byteOffset, encoding, false)
 	}
 	
 	function hexWrite (buf, string, offset, length) {
@@ -11048,14 +11505,14 @@ var birchoutline =
 	
 	  // must be an even number of digits
 	  var strLen = string.length
-	  if (strLen % 2 !== 0) throw new Error('Invalid hex string')
+	  if (strLen % 2 !== 0) throw new TypeError('Invalid hex string')
 	
 	  if (length > strLen / 2) {
 	    length = strLen / 2
 	  }
-	  for (var i = 0; i < length; i++) {
+	  for (var i = 0; i < length; ++i) {
 	    var parsed = parseInt(string.substr(i * 2, 2), 16)
-	    if (isNaN(parsed)) throw new Error('Invalid hex string')
+	    if (isNaN(parsed)) return i
 	    buf[offset + i] = parsed
 	  }
 	  return i
@@ -11069,7 +11526,7 @@ var birchoutline =
 	  return blitBuffer(asciiToBytes(string), buf, offset, length)
 	}
 	
-	function binaryWrite (buf, string, offset, length) {
+	function latin1Write (buf, string, offset, length) {
 	  return asciiWrite(buf, string, offset, length)
 	}
 	
@@ -11104,17 +11561,16 @@ var birchoutline =
 	    }
 	  // legacy write(string, encoding, offset, length) - remove in v0.13
 	  } else {
-	    var swap = encoding
-	    encoding = offset
-	    offset = length | 0
-	    length = swap
+	    throw new Error(
+	      'Buffer.write(string, encoding, offset[, length]) is no longer supported'
+	    )
 	  }
 	
 	  var remaining = this.length - offset
 	  if (length === undefined || length > remaining) length = remaining
 	
 	  if ((string.length > 0 && (length < 0 || offset < 0)) || offset > this.length) {
-	    throw new RangeError('attempt to write outside buffer bounds')
+	    throw new RangeError('Attempt to write outside buffer bounds')
 	  }
 	
 	  if (!encoding) encoding = 'utf8'
@@ -11132,8 +11588,9 @@ var birchoutline =
 	      case 'ascii':
 	        return asciiWrite(this, string, offset, length)
 	
+	      case 'latin1':
 	      case 'binary':
-	        return binaryWrite(this, string, offset, length)
+	        return latin1Write(this, string, offset, length)
 	
 	      case 'base64':
 	        // Warning: maxLength not taken into account in base64Write
@@ -11268,17 +11725,17 @@ var birchoutline =
 	  var ret = ''
 	  end = Math.min(buf.length, end)
 	
-	  for (var i = start; i < end; i++) {
+	  for (var i = start; i < end; ++i) {
 	    ret += String.fromCharCode(buf[i] & 0x7F)
 	  }
 	  return ret
 	}
 	
-	function binarySlice (buf, start, end) {
+	function latin1Slice (buf, start, end) {
 	  var ret = ''
 	  end = Math.min(buf.length, end)
 	
-	  for (var i = start; i < end; i++) {
+	  for (var i = start; i < end; ++i) {
 	    ret += String.fromCharCode(buf[i])
 	  }
 	  return ret
@@ -11291,7 +11748,7 @@ var birchoutline =
 	  if (!end || end < 0 || end > len) end = len
 	
 	  var out = ''
-	  for (var i = start; i < end; i++) {
+	  for (var i = start; i < end; ++i) {
 	    out += toHex(buf[i])
 	  }
 	  return out
@@ -11329,16 +11786,15 @@ var birchoutline =
 	
 	  var newBuf
 	  if (Buffer.TYPED_ARRAY_SUPPORT) {
-	    newBuf = Buffer._augment(this.subarray(start, end))
+	    newBuf = this.subarray(start, end)
+	    newBuf.__proto__ = Buffer.prototype
 	  } else {
 	    var sliceLen = end - start
 	    newBuf = new Buffer(sliceLen, undefined)
-	    for (var i = 0; i < sliceLen; i++) {
+	    for (var i = 0; i < sliceLen; ++i) {
 	      newBuf[i] = this[i + start]
 	    }
 	  }
-	
-	  if (newBuf.length) newBuf.parent = this.parent || this
 	
 	  return newBuf
 	}
@@ -11508,16 +11964,19 @@ var birchoutline =
 	}
 	
 	function checkInt (buf, value, offset, ext, max, min) {
-	  if (!Buffer.isBuffer(buf)) throw new TypeError('buffer must be a Buffer instance')
-	  if (value > max || value < min) throw new RangeError('value is out of bounds')
-	  if (offset + ext > buf.length) throw new RangeError('index out of range')
+	  if (!Buffer.isBuffer(buf)) throw new TypeError('"buffer" argument must be a Buffer instance')
+	  if (value > max || value < min) throw new RangeError('"value" argument is out of bounds')
+	  if (offset + ext > buf.length) throw new RangeError('Index out of range')
 	}
 	
 	Buffer.prototype.writeUIntLE = function writeUIntLE (value, offset, byteLength, noAssert) {
 	  value = +value
 	  offset = offset | 0
 	  byteLength = byteLength | 0
-	  if (!noAssert) checkInt(this, value, offset, byteLength, Math.pow(2, 8 * byteLength), 0)
+	  if (!noAssert) {
+	    var maxBytes = Math.pow(2, 8 * byteLength) - 1
+	    checkInt(this, value, offset, byteLength, maxBytes, 0)
+	  }
 	
 	  var mul = 1
 	  var i = 0
@@ -11533,7 +11992,10 @@ var birchoutline =
 	  value = +value
 	  offset = offset | 0
 	  byteLength = byteLength | 0
-	  if (!noAssert) checkInt(this, value, offset, byteLength, Math.pow(2, 8 * byteLength), 0)
+	  if (!noAssert) {
+	    var maxBytes = Math.pow(2, 8 * byteLength) - 1
+	    checkInt(this, value, offset, byteLength, maxBytes, 0)
+	  }
 	
 	  var i = byteLength - 1
 	  var mul = 1
@@ -11556,7 +12018,7 @@ var birchoutline =
 	
 	function objectWriteUInt16 (buf, value, offset, littleEndian) {
 	  if (value < 0) value = 0xffff + value + 1
-	  for (var i = 0, j = Math.min(buf.length - offset, 2); i < j; i++) {
+	  for (var i = 0, j = Math.min(buf.length - offset, 2); i < j; ++i) {
 	    buf[offset + i] = (value & (0xff << (8 * (littleEndian ? i : 1 - i)))) >>>
 	      (littleEndian ? i : 1 - i) * 8
 	  }
@@ -11590,7 +12052,7 @@ var birchoutline =
 	
 	function objectWriteUInt32 (buf, value, offset, littleEndian) {
 	  if (value < 0) value = 0xffffffff + value + 1
-	  for (var i = 0, j = Math.min(buf.length - offset, 4); i < j; i++) {
+	  for (var i = 0, j = Math.min(buf.length - offset, 4); i < j; ++i) {
 	    buf[offset + i] = (value >>> (littleEndian ? i : 3 - i) * 8) & 0xff
 	  }
 	}
@@ -11636,9 +12098,12 @@ var birchoutline =
 	
 	  var i = 0
 	  var mul = 1
-	  var sub = value < 0 ? 1 : 0
+	  var sub = 0
 	  this[offset] = value & 0xFF
 	  while (++i < byteLength && (mul *= 0x100)) {
+	    if (value < 0 && sub === 0 && this[offset + i - 1] !== 0) {
+	      sub = 1
+	    }
 	    this[offset + i] = ((value / mul) >> 0) - sub & 0xFF
 	  }
 	
@@ -11656,9 +12121,12 @@ var birchoutline =
 	
 	  var i = byteLength - 1
 	  var mul = 1
-	  var sub = value < 0 ? 1 : 0
+	  var sub = 0
 	  this[offset + i] = value & 0xFF
 	  while (--i >= 0 && (mul *= 0x100)) {
+	    if (value < 0 && sub === 0 && this[offset + i + 1] !== 0) {
+	      sub = 1
+	    }
 	    this[offset + i] = ((value / mul) >> 0) - sub & 0xFF
 	  }
 	
@@ -11733,9 +12201,8 @@ var birchoutline =
 	}
 	
 	function checkIEEE754 (buf, value, offset, ext, max, min) {
-	  if (value > max || value < min) throw new RangeError('value is out of bounds')
-	  if (offset + ext > buf.length) throw new RangeError('index out of range')
-	  if (offset < 0) throw new RangeError('index out of range')
+	  if (offset + ext > buf.length) throw new RangeError('Index out of range')
+	  if (offset < 0) throw new RangeError('Index out of range')
 	}
 	
 	function writeFloat (buf, value, offset, littleEndian, noAssert) {
@@ -11800,142 +12267,90 @@ var birchoutline =
 	
 	  if (this === target && start < targetStart && targetStart < end) {
 	    // descending copy from end
-	    for (i = len - 1; i >= 0; i--) {
+	    for (i = len - 1; i >= 0; --i) {
 	      target[i + targetStart] = this[i + start]
 	    }
 	  } else if (len < 1000 || !Buffer.TYPED_ARRAY_SUPPORT) {
 	    // ascending copy from start
-	    for (i = 0; i < len; i++) {
+	    for (i = 0; i < len; ++i) {
 	      target[i + targetStart] = this[i + start]
 	    }
 	  } else {
-	    target._set(this.subarray(start, start + len), targetStart)
+	    Uint8Array.prototype.set.call(
+	      target,
+	      this.subarray(start, start + len),
+	      targetStart
+	    )
 	  }
 	
 	  return len
 	}
 	
-	// fill(value, start=0, end=buffer.length)
-	Buffer.prototype.fill = function fill (value, start, end) {
-	  if (!value) value = 0
-	  if (!start) start = 0
-	  if (!end) end = this.length
+	// Usage:
+	//    buffer.fill(number[, offset[, end]])
+	//    buffer.fill(buffer[, offset[, end]])
+	//    buffer.fill(string[, offset[, end]][, encoding])
+	Buffer.prototype.fill = function fill (val, start, end, encoding) {
+	  // Handle string cases:
+	  if (typeof val === 'string') {
+	    if (typeof start === 'string') {
+	      encoding = start
+	      start = 0
+	      end = this.length
+	    } else if (typeof end === 'string') {
+	      encoding = end
+	      end = this.length
+	    }
+	    if (val.length === 1) {
+	      var code = val.charCodeAt(0)
+	      if (code < 256) {
+	        val = code
+	      }
+	    }
+	    if (encoding !== undefined && typeof encoding !== 'string') {
+	      throw new TypeError('encoding must be a string')
+	    }
+	    if (typeof encoding === 'string' && !Buffer.isEncoding(encoding)) {
+	      throw new TypeError('Unknown encoding: ' + encoding)
+	    }
+	  } else if (typeof val === 'number') {
+	    val = val & 255
+	  }
 	
-	  if (end < start) throw new RangeError('end < start')
+	  // Invalid ranges are not set to a default, so can range check early.
+	  if (start < 0 || this.length < start || this.length < end) {
+	    throw new RangeError('Out of range index')
+	  }
 	
-	  // Fill 0 bytes; we're done
-	  if (end === start) return
-	  if (this.length === 0) return
+	  if (end <= start) {
+	    return this
+	  }
 	
-	  if (start < 0 || start >= this.length) throw new RangeError('start out of bounds')
-	  if (end < 0 || end > this.length) throw new RangeError('end out of bounds')
+	  start = start >>> 0
+	  end = end === undefined ? this.length : end >>> 0
+	
+	  if (!val) val = 0
 	
 	  var i
-	  if (typeof value === 'number') {
-	    for (i = start; i < end; i++) {
-	      this[i] = value
+	  if (typeof val === 'number') {
+	    for (i = start; i < end; ++i) {
+	      this[i] = val
 	    }
 	  } else {
-	    var bytes = utf8ToBytes(value.toString())
+	    var bytes = Buffer.isBuffer(val)
+	      ? val
+	      : utf8ToBytes(new Buffer(val, encoding).toString())
 	    var len = bytes.length
-	    for (i = start; i < end; i++) {
-	      this[i] = bytes[i % len]
+	    for (i = 0; i < end - start; ++i) {
+	      this[i + start] = bytes[i % len]
 	    }
 	  }
 	
 	  return this
 	}
 	
-	/**
-	 * Creates a new `ArrayBuffer` with the *copied* memory of the buffer instance.
-	 * Added in Node 0.12. Only available in browsers that support ArrayBuffer.
-	 */
-	Buffer.prototype.toArrayBuffer = function toArrayBuffer () {
-	  if (typeof Uint8Array !== 'undefined') {
-	    if (Buffer.TYPED_ARRAY_SUPPORT) {
-	      return (new Buffer(this)).buffer
-	    } else {
-	      var buf = new Uint8Array(this.length)
-	      for (var i = 0, len = buf.length; i < len; i += 1) {
-	        buf[i] = this[i]
-	      }
-	      return buf.buffer
-	    }
-	  } else {
-	    throw new TypeError('Buffer.toArrayBuffer not supported in this browser')
-	  }
-	}
-	
 	// HELPER FUNCTIONS
 	// ================
-	
-	var BP = Buffer.prototype
-	
-	/**
-	 * Augment a Uint8Array *instance* (not the Uint8Array class!) with Buffer methods
-	 */
-	Buffer._augment = function _augment (arr) {
-	  arr.constructor = Buffer
-	  arr._isBuffer = true
-	
-	  // save reference to original Uint8Array set method before overwriting
-	  arr._set = arr.set
-	
-	  // deprecated
-	  arr.get = BP.get
-	  arr.set = BP.set
-	
-	  arr.write = BP.write
-	  arr.toString = BP.toString
-	  arr.toLocaleString = BP.toString
-	  arr.toJSON = BP.toJSON
-	  arr.equals = BP.equals
-	  arr.compare = BP.compare
-	  arr.indexOf = BP.indexOf
-	  arr.copy = BP.copy
-	  arr.slice = BP.slice
-	  arr.readUIntLE = BP.readUIntLE
-	  arr.readUIntBE = BP.readUIntBE
-	  arr.readUInt8 = BP.readUInt8
-	  arr.readUInt16LE = BP.readUInt16LE
-	  arr.readUInt16BE = BP.readUInt16BE
-	  arr.readUInt32LE = BP.readUInt32LE
-	  arr.readUInt32BE = BP.readUInt32BE
-	  arr.readIntLE = BP.readIntLE
-	  arr.readIntBE = BP.readIntBE
-	  arr.readInt8 = BP.readInt8
-	  arr.readInt16LE = BP.readInt16LE
-	  arr.readInt16BE = BP.readInt16BE
-	  arr.readInt32LE = BP.readInt32LE
-	  arr.readInt32BE = BP.readInt32BE
-	  arr.readFloatLE = BP.readFloatLE
-	  arr.readFloatBE = BP.readFloatBE
-	  arr.readDoubleLE = BP.readDoubleLE
-	  arr.readDoubleBE = BP.readDoubleBE
-	  arr.writeUInt8 = BP.writeUInt8
-	  arr.writeUIntLE = BP.writeUIntLE
-	  arr.writeUIntBE = BP.writeUIntBE
-	  arr.writeUInt16LE = BP.writeUInt16LE
-	  arr.writeUInt16BE = BP.writeUInt16BE
-	  arr.writeUInt32LE = BP.writeUInt32LE
-	  arr.writeUInt32BE = BP.writeUInt32BE
-	  arr.writeIntLE = BP.writeIntLE
-	  arr.writeIntBE = BP.writeIntBE
-	  arr.writeInt8 = BP.writeInt8
-	  arr.writeInt16LE = BP.writeInt16LE
-	  arr.writeInt16BE = BP.writeInt16BE
-	  arr.writeInt32LE = BP.writeInt32LE
-	  arr.writeInt32BE = BP.writeInt32BE
-	  arr.writeFloatLE = BP.writeFloatLE
-	  arr.writeFloatBE = BP.writeFloatBE
-	  arr.writeDoubleLE = BP.writeDoubleLE
-	  arr.writeDoubleBE = BP.writeDoubleBE
-	  arr.fill = BP.fill
-	  arr.inspect = BP.inspect
-	  arr.toArrayBuffer = BP.toArrayBuffer
-	
-	  return arr
-	}
 	
 	var INVALID_BASE64_RE = /[^+\/0-9A-Za-z-_]/g
 	
@@ -11968,7 +12383,7 @@ var birchoutline =
 	  var leadSurrogate = null
 	  var bytes = []
 	
-	  for (var i = 0; i < length; i++) {
+	  for (var i = 0; i < length; ++i) {
 	    codePoint = string.charCodeAt(i)
 	
 	    // is surrogate component
@@ -12043,7 +12458,7 @@ var birchoutline =
 	
 	function asciiToBytes (str) {
 	  var byteArray = []
-	  for (var i = 0; i < str.length; i++) {
+	  for (var i = 0; i < str.length; ++i) {
 	    // Node's code seems to be doing this and not & 0x7F..
 	    byteArray.push(str.charCodeAt(i) & 0xFF)
 	  }
@@ -12053,7 +12468,7 @@ var birchoutline =
 	function utf16leToBytes (str, units) {
 	  var c, hi, lo
 	  var byteArray = []
-	  for (var i = 0; i < str.length; i++) {
+	  for (var i = 0; i < str.length; ++i) {
 	    if ((units -= 2) < 0) break
 	
 	    c = str.charCodeAt(i)
@@ -12071,143 +12486,132 @@ var birchoutline =
 	}
 	
 	function blitBuffer (src, dst, offset, length) {
-	  for (var i = 0; i < length; i++) {
+	  for (var i = 0; i < length; ++i) {
 	    if ((i + offset >= dst.length) || (i >= src.length)) break
 	    dst[i + offset] = src[i]
 	  }
 	  return i
 	}
 	
+	function isnan (val) {
+	  return val !== val // eslint-disable-line no-self-compare
+	}
+	
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(41).Buffer, (function() { return this; }())))
 
 /***/ },
 /* 42 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ function(module, exports) {
 
-	var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+	'use strict'
 	
-	;(function (exports) {
-		'use strict';
+	exports.toByteArray = toByteArray
+	exports.fromByteArray = fromByteArray
 	
-	  var Arr = (typeof Uint8Array !== 'undefined')
-	    ? Uint8Array
-	    : Array
+	var lookup = []
+	var revLookup = []
+	var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array
 	
-		var PLUS   = '+'.charCodeAt(0)
-		var SLASH  = '/'.charCodeAt(0)
-		var NUMBER = '0'.charCodeAt(0)
-		var LOWER  = 'a'.charCodeAt(0)
-		var UPPER  = 'A'.charCodeAt(0)
-		var PLUS_URL_SAFE = '-'.charCodeAt(0)
-		var SLASH_URL_SAFE = '_'.charCodeAt(0)
+	function init () {
+	  var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+	  for (var i = 0, len = code.length; i < len; ++i) {
+	    lookup[i] = code[i]
+	    revLookup[code.charCodeAt(i)] = i
+	  }
 	
-		function decode (elt) {
-			var code = elt.charCodeAt(0)
-			if (code === PLUS ||
-			    code === PLUS_URL_SAFE)
-				return 62 // '+'
-			if (code === SLASH ||
-			    code === SLASH_URL_SAFE)
-				return 63 // '/'
-			if (code < NUMBER)
-				return -1 //no match
-			if (code < NUMBER + 10)
-				return code - NUMBER + 26 + 26
-			if (code < UPPER + 26)
-				return code - UPPER
-			if (code < LOWER + 26)
-				return code - LOWER + 26
-		}
+	  revLookup['-'.charCodeAt(0)] = 62
+	  revLookup['_'.charCodeAt(0)] = 63
+	}
 	
-		function b64ToByteArray (b64) {
-			var i, j, l, tmp, placeHolders, arr
+	init()
 	
-			if (b64.length % 4 > 0) {
-				throw new Error('Invalid string. Length must be a multiple of 4')
-			}
+	function toByteArray (b64) {
+	  var i, j, l, tmp, placeHolders, arr
+	  var len = b64.length
 	
-			// the number of equal signs (place holders)
-			// if there are two placeholders, than the two characters before it
-			// represent one byte
-			// if there is only one, then the three characters before it represent 2 bytes
-			// this is just a cheap hack to not do indexOf twice
-			var len = b64.length
-			placeHolders = '=' === b64.charAt(len - 2) ? 2 : '=' === b64.charAt(len - 1) ? 1 : 0
+	  if (len % 4 > 0) {
+	    throw new Error('Invalid string. Length must be a multiple of 4')
+	  }
 	
-			// base64 is 4/3 + up to two characters of the original data
-			arr = new Arr(b64.length * 3 / 4 - placeHolders)
+	  // the number of equal signs (place holders)
+	  // if there are two placeholders, than the two characters before it
+	  // represent one byte
+	  // if there is only one, then the three characters before it represent 2 bytes
+	  // this is just a cheap hack to not do indexOf twice
+	  placeHolders = b64[len - 2] === '=' ? 2 : b64[len - 1] === '=' ? 1 : 0
 	
-			// if there are placeholders, only get up to the last complete 4 chars
-			l = placeHolders > 0 ? b64.length - 4 : b64.length
+	  // base64 is 4/3 + up to two characters of the original data
+	  arr = new Arr(len * 3 / 4 - placeHolders)
 	
-			var L = 0
+	  // if there are placeholders, only get up to the last complete 4 chars
+	  l = placeHolders > 0 ? len - 4 : len
 	
-			function push (v) {
-				arr[L++] = v
-			}
+	  var L = 0
 	
-			for (i = 0, j = 0; i < l; i += 4, j += 3) {
-				tmp = (decode(b64.charAt(i)) << 18) | (decode(b64.charAt(i + 1)) << 12) | (decode(b64.charAt(i + 2)) << 6) | decode(b64.charAt(i + 3))
-				push((tmp & 0xFF0000) >> 16)
-				push((tmp & 0xFF00) >> 8)
-				push(tmp & 0xFF)
-			}
+	  for (i = 0, j = 0; i < l; i += 4, j += 3) {
+	    tmp = (revLookup[b64.charCodeAt(i)] << 18) | (revLookup[b64.charCodeAt(i + 1)] << 12) | (revLookup[b64.charCodeAt(i + 2)] << 6) | revLookup[b64.charCodeAt(i + 3)]
+	    arr[L++] = (tmp >> 16) & 0xFF
+	    arr[L++] = (tmp >> 8) & 0xFF
+	    arr[L++] = tmp & 0xFF
+	  }
 	
-			if (placeHolders === 2) {
-				tmp = (decode(b64.charAt(i)) << 2) | (decode(b64.charAt(i + 1)) >> 4)
-				push(tmp & 0xFF)
-			} else if (placeHolders === 1) {
-				tmp = (decode(b64.charAt(i)) << 10) | (decode(b64.charAt(i + 1)) << 4) | (decode(b64.charAt(i + 2)) >> 2)
-				push((tmp >> 8) & 0xFF)
-				push(tmp & 0xFF)
-			}
+	  if (placeHolders === 2) {
+	    tmp = (revLookup[b64.charCodeAt(i)] << 2) | (revLookup[b64.charCodeAt(i + 1)] >> 4)
+	    arr[L++] = tmp & 0xFF
+	  } else if (placeHolders === 1) {
+	    tmp = (revLookup[b64.charCodeAt(i)] << 10) | (revLookup[b64.charCodeAt(i + 1)] << 4) | (revLookup[b64.charCodeAt(i + 2)] >> 2)
+	    arr[L++] = (tmp >> 8) & 0xFF
+	    arr[L++] = tmp & 0xFF
+	  }
 	
-			return arr
-		}
+	  return arr
+	}
 	
-		function uint8ToBase64 (uint8) {
-			var i,
-				extraBytes = uint8.length % 3, // if we have 1 byte left, pad 2 bytes
-				output = "",
-				temp, length
+	function tripletToBase64 (num) {
+	  return lookup[num >> 18 & 0x3F] + lookup[num >> 12 & 0x3F] + lookup[num >> 6 & 0x3F] + lookup[num & 0x3F]
+	}
 	
-			function encode (num) {
-				return lookup.charAt(num)
-			}
+	function encodeChunk (uint8, start, end) {
+	  var tmp
+	  var output = []
+	  for (var i = start; i < end; i += 3) {
+	    tmp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
+	    output.push(tripletToBase64(tmp))
+	  }
+	  return output.join('')
+	}
 	
-			function tripletToBase64 (num) {
-				return encode(num >> 18 & 0x3F) + encode(num >> 12 & 0x3F) + encode(num >> 6 & 0x3F) + encode(num & 0x3F)
-			}
+	function fromByteArray (uint8) {
+	  var tmp
+	  var len = uint8.length
+	  var extraBytes = len % 3 // if we have 1 byte left, pad 2 bytes
+	  var output = ''
+	  var parts = []
+	  var maxChunkLength = 16383 // must be multiple of 3
 	
-			// go through the array every three bytes, we'll deal with trailing stuff later
-			for (i = 0, length = uint8.length - extraBytes; i < length; i += 3) {
-				temp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
-				output += tripletToBase64(temp)
-			}
+	  // go through the array every three bytes, we'll deal with trailing stuff later
+	  for (var i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
+	    parts.push(encodeChunk(uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)))
+	  }
 	
-			// pad the end with zeros, but make sure to not forget the extra bytes
-			switch (extraBytes) {
-				case 1:
-					temp = uint8[uint8.length - 1]
-					output += encode(temp >> 2)
-					output += encode((temp << 4) & 0x3F)
-					output += '=='
-					break
-				case 2:
-					temp = (uint8[uint8.length - 2] << 8) + (uint8[uint8.length - 1])
-					output += encode(temp >> 10)
-					output += encode((temp >> 4) & 0x3F)
-					output += encode((temp << 2) & 0x3F)
-					output += '='
-					break
-			}
+	  // pad the end with zeros, but make sure to not forget the extra bytes
+	  if (extraBytes === 1) {
+	    tmp = uint8[len - 1]
+	    output += lookup[tmp >> 2]
+	    output += lookup[(tmp << 4) & 0x3F]
+	    output += '=='
+	  } else if (extraBytes === 2) {
+	    tmp = (uint8[len - 2] << 8) + (uint8[len - 1])
+	    output += lookup[tmp >> 10]
+	    output += lookup[(tmp >> 4) & 0x3F]
+	    output += lookup[(tmp << 2) & 0x3F]
+	    output += '='
+	  }
 	
-			return output
-		}
+	  parts.push(output)
 	
-		exports.toByteArray = b64ToByteArray
-		exports.fromByteArray = uint8ToBase64
-	}( false ? (this.base64js = {}) : exports))
+	  return parts.join('')
+	}
 
 
 /***/ },
@@ -15141,36 +15545,36 @@ var birchoutline =
 	  Section: Serialize & Deserialize Items
 	   */
 	
-	  ItemSerializer.serializeItems = function(items, options) {
-	    var context, each, emptyEncodeLastItem, endOffset, firstItem, i, itemBody, itemStack, j, lastItem, len, len1, ref, serialization, startOffset;
+	  ItemSerializer.serializeItems = function(items, options, legacyOptions) {
+	    var context, each, emptyEncodeLastItem, endOffset, firstItem, i, itemBody, itemStack, j, lastItem, len, len1, ref, ref1, ref2, ref3, serialization, startOffset;
 	    if (options == null) {
 	      options = {};
 	    }
-	    if (typeof options === 'string') {
+	    if (typeof legacyOptions === 'string') {
 	      options = {
-	        type: options
+	        type: legacyOptions
 	      };
 	    }
 	    firstItem = items[0];
 	    lastItem = items[items.length - 1];
 	    if (options.type == null) {
-	      options.type = ItemSerializer.BMLType;
+	      options.type = (ref = (ref1 = items[0]) != null ? ref1.outline.type : void 0) != null ? ref : ItemSerializer.BMLType;
 	    }
 	    if (options.startOffset == null) {
 	      options.startOffset = 0;
 	    }
 	    if (options.endOffset == null) {
-	      options.endOffset = lastItem.bodyString.length;
+	      options.endOffset = (ref2 = lastItem != null ? lastItem.bodyString.length : void 0) != null ? ref2 : 0;
 	    }
 	    if (options.baseDepth == null) {
 	      options.baseDepth = Number.MAX_VALUE;
 	    }
 	    serialization = ((function() {
-	      var i, len, ref, results1;
-	      ref = this.getSerializationsForType(options['type']);
+	      var i, len, ref3, results1;
+	      ref3 = this.getSerializationsForType(options['type']);
 	      results1 = [];
-	      for (i = 0, len = ref.length; i < len; i++) {
-	        each = ref[i];
+	      for (i = 0, len = ref3.length; i < len; i++) {
+	        each = ref3[i];
 	        if (each.beginSerialization) {
 	          results1.push(each);
 	        }
@@ -15202,7 +15606,7 @@ var birchoutline =
 	      itemStack = [];
 	      for (j = 0, len1 = items.length; j < len1; j++) {
 	        each = items[j];
-	        while (((ref = itemStack[itemStack.length - 1]) != null ? ref.depth : void 0) >= each.depth) {
+	        while (((ref3 = itemStack[itemStack.length - 1]) != null ? ref3.depth : void 0) >= each.depth) {
 	          serialization.endSerializeItem(itemStack.pop(), options, context);
 	        }
 	        itemStack.push(each);
@@ -15228,19 +15632,24 @@ var birchoutline =
 	  };
 	
 	  ItemSerializer.deserializeItems = function(serializedItems, outline, options) {
-	    var each, serialization;
+	    var each, ref, serialization;
 	    if (options == null) {
 	      options = {};
 	    }
+	    if (typeof options === 'string') {
+	      options = {
+	        type: options
+	      };
+	    }
 	    if (options['type'] == null) {
-	      options['type'] = ItemSerializer.BMLType;
+	      options['type'] = (ref = outline.type) != null ? ref : ItemSerializer.BMLType;
 	    }
 	    serialization = ((function() {
-	      var i, len, ref, results1;
-	      ref = this.getSerializationsForType(options['type']);
+	      var i, len, ref1, results1;
+	      ref1 = this.getSerializationsForType(options['type']);
 	      results1 = [];
-	      for (i = 0, len = ref.length; i < len; i++) {
-	        each = ref[i];
+	      for (i = 0, len = ref1.length; i < len; i++) {
+	        each = ref1[i];
 	        if (each.deserializeItems) {
 	          results1.push(each);
 	        }
@@ -15265,28 +15674,35 @@ var birchoutline =
 	  priority: 1,
 	  extensions: ['bml'],
 	  types: [ItemSerializer.BMLType],
-	  serialization: __webpack_require__(184)
+	  serialization: __webpack_require__(190)
 	});
 	
 	ItemSerializer.registerSerialization({
 	  priority: 2,
 	  extensions: ['opml'],
 	  types: [ItemSerializer.OPMLType],
-	  serialization: __webpack_require__(185)
+	  serialization: __webpack_require__(191)
 	});
 	
 	ItemSerializer.registerSerialization({
 	  priority: 3,
 	  extensions: ['taskpaper'],
 	  types: [ItemSerializer.TaskPaperType],
-	  serialization: __webpack_require__(186)
+	  serialization: __webpack_require__(192)
 	});
 	
 	ItemSerializer.registerSerialization({
 	  priority: 4,
 	  extensions: [],
+	  types: ['NSFilenamesPboardType'],
+	  serialization: __webpack_require__(198)
+	});
+	
+	ItemSerializer.registerSerialization({
+	  priority: 5,
+	  extensions: [],
 	  types: [ItemSerializer.TEXTType],
-	  serialization: __webpack_require__(191)
+	  serialization: __webpack_require__(197)
 	});
 	
 	module.exports = ItemSerializer;
@@ -15389,25 +15805,31 @@ var birchoutline =
 /* 75 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var AttributedString, DateTime, Item, ItemPath, Mutation, _, assert;
+	var AttributedString, DateTime, Item, ItemPath, Mutation, _, assert, ctphHash, stringHash;
 	
 	AttributedString = __webpack_require__(7);
 	
-	DateTime = __webpack_require__(76);
+	stringHash = __webpack_require__(76);
 	
-	ItemPath = __webpack_require__(181);
+	DateTime = __webpack_require__(77);
 	
-	Mutation = __webpack_require__(183);
+	ItemPath = __webpack_require__(186);
+	
+	Mutation = __webpack_require__(188);
 	
 	_ = __webpack_require__(14);
 	
 	assert = __webpack_require__(9).assert;
 	
+	ctphHash = __webpack_require__(189);
+	
 	module.exports = Item = (function() {
 	  function Item(outline, text, id, remappedIDCallback) {
 	    this.id = outline.nextOutlineUniqueItemID(id);
+	    this.cachedBranchContentID = null;
 	    this.outline = outline;
 	    this.inOutline = false;
+	    this.recordedUndoableChanges = false;
 	    this.bodyHighlighted = null;
 	    if (text instanceof AttributedString) {
 	      this.body = text;
@@ -15428,6 +15850,43 @@ var birchoutline =
 	   */
 	
 	  Item.prototype.id = null;
+	
+	  Item.prototype.contentID = null;
+	
+	  Object.defineProperty(Item.prototype, 'contentID', {
+	    get: function() {
+	      return stringHash(this.bodyString);
+	    }
+	  });
+	
+	  Item.prototype.branchContentID = null;
+	
+	  Object.defineProperty(Item.prototype, 'branchContentID', {
+	    get: function() {
+	      var childBranchContentIDs, each;
+	      if (!this.cachedBranchContentID) {
+	        childBranchContentIDs = [this.contentID];
+	        each = this.firstChild;
+	        while (each) {
+	          childBranchContentIDs.push(each.branchContentID);
+	          each = each.nextSibling;
+	        }
+	        this.cachedBranchContentID = "" + (stringHash(childBranchContentIDs.join('')));
+	      }
+	      return this.cachedBranchContentID;
+	    }
+	  });
+	
+	  Item.prototype.clearCachedBranchContentID = function() {
+	    var each, results1;
+	    each = this;
+	    results1 = [];
+	    while (each) {
+	      each.cachedBranchContentID = null;
+	      results1.push(each = each.parent);
+	    }
+	    return results1;
+	  };
 	
 	  Item.prototype.outline = null;
 	
@@ -15455,6 +15914,7 @@ var birchoutline =
 	      var each;
 	      if (this.inOutline !== isInOutline) {
 	        if (isInOutline) {
+	          this.recordedUndoableChanges = true;
 	          this.outline.idsToItems.set(this.id, this);
 	        } else {
 	          this.outline.idsToItems["delete"](this.id);
@@ -15723,60 +16183,59 @@ var birchoutline =
 	    return commonAncestors;
 	  };
 	
-	  Item._insertGroup = function(group, groupDepth, stack, roots) {
-	    var each, j, k, len, len1, parent, top;
-	    top = stack[stack.length - 1];
-	    while (top && top.depth > groupDepth) {
-	      top = stack.pop();
-	    }
-	    if (top && top.depth === groupDepth) {
-	      parent = top.parent;
-	    } else {
-	      stack.push(top);
-	      parent = top;
-	    }
-	    if (parent) {
-	      for (j = 0, len = group.length; j < len; j++) {
-	        each = group[j];
-	        each.indent = groupDepth - parent.depth;
-	      }
-	      parent.insertChildrenBefore(group, null, true);
-	    } else {
-	      for (k = 0, len1 = group.length; k < len1; k++) {
-	        each = group[k];
-	        roots.push(each);
-	      }
-	    }
-	    return stack.push(group[group.length - 1]);
-	  };
-	
-	  Item.buildItemHiearchy = function(items, stack) {
-	    var each, group, groupDepth, j, len, roots;
-	    if (stack == null) {
-	      stack = [];
+	  Item.buildItemHiearchy = function(items, parentStack) {
+	    var each, eachDepth, insertSiblings, j, len, newGroup, parent, roots, siblings, siblingsStack;
+	    if (parentStack == null) {
+	      parentStack = [];
 	    }
 	    Item.removeItemsFromParents(items);
 	    roots = [];
+	    siblingsStack = [];
+	    insertSiblings = function(siblings) {
+	      var each, j, len, parentDepth, siblingsDepth, siblingsIndent;
+	      if (siblings.parent) {
+	        parentDepth = siblings.parent.depth;
+	        siblingsDepth = siblings.depth;
+	        siblingsIndent = siblingsDepth - parentDepth;
+	        for (j = 0, len = siblings.length; j < len; j++) {
+	          each = siblings[j];
+	          each.indent = siblingsIndent;
+	        }
+	        return siblings.parent.insertChildrenBefore(siblings, null, true);
+	      } else {
+	        return roots = roots.concat(siblings);
+	      }
+	    };
 	    for (j = 0, len = items.length; j < len; j++) {
 	      each = items[j];
-	      if (groupDepth === each.depth) {
-	        group.push(each);
-	      } else {
-	        if (group) {
-	          this._insertGroup(group, groupDepth, stack, roots);
-	        }
-	        groupDepth = each.depth;
-	        group = [each];
+	      eachDepth = each.depth;
+	      while ((siblings = siblingsStack[siblingsStack.length - 1]) && siblings.depth > eachDepth) {
+	        insertSiblings(siblings);
+	        siblingsStack.pop();
 	      }
+	      if (siblings && siblings.depth === eachDepth) {
+	        siblings.push(each);
+	      } else {
+	        while ((parent = parentStack[parentStack.length - 1]) && parent.depth >= eachDepth) {
+	          parentStack.pop();
+	        }
+	        newGroup = [each];
+	        newGroup.parent = parent;
+	        newGroup.depth = eachDepth;
+	        siblingsStack.push(newGroup);
+	      }
+	      parentStack.push(each);
 	    }
-	    if (group) {
-	      this._insertGroup(group, groupDepth, stack, roots);
+	    while (siblingsStack.length) {
+	      siblings = siblingsStack[siblingsStack.length - 1];
+	      insertSiblings(siblings);
+	      siblingsStack.pop();
 	    }
 	    return roots;
 	  };
 	
 	  Item.flattenItemHiearchy = function(items, removeFromParents) {
-	    var each, eachDescendant, flattenedItems, j, k, l, len, len1, len2, ref;
+	    var each, eachDescendant, flattenedItems, j, k, len, len1, ref;
 	    if (removeFromParents == null) {
 	      removeFromParents = true;
 	    }
@@ -15793,29 +16252,28 @@ var birchoutline =
 	      }
 	    }
 	    if (removeFromParents) {
-	      for (l = 0, len2 = flattenedItems.length; l < len2; l++) {
-	        each = flattenedItems[l];
-	        each.removeFromParent();
-	      }
+	      this.removeItemsFromParents(flattenedItems);
 	    }
 	    return flattenedItems;
 	  };
 	
 	  Item.removeItemsFromParents = function(items) {
-	    var each, j, next, ref, ref1, siblings;
+	    var each, j, len, previous, ref, ref1, siblings;
 	    siblings = [];
-	    next = null;
-	    for (j = items.length - 1; j >= 0; j += -1) {
+	    previous = null;
+	    for (j = 0, len = items.length; j < len; j++) {
 	      each = items[j];
-	      if (!next || next.previousSibling === each) {
-	        siblings.unshift(each);
-	      } else {
-	        if ((ref = siblings[0].parent) != null) {
-	          ref.removeChildren(siblings);
+	      if (each.parent != null) {
+	        if (!previous || previous.nextSibling === each) {
+	          siblings.push(each);
+	        } else {
+	          if ((ref = siblings[0].parent) != null) {
+	            ref.removeChildren(siblings);
+	          }
+	          siblings = [each];
 	        }
-	        siblings = [each];
+	        previous = each;
 	      }
-	      next = each;
 	    }
 	    if (siblings.length) {
 	      return (ref1 = siblings[0].parent) != null ? ref1.removeChildren(siblings) : void 0;
@@ -15881,7 +16339,7 @@ var birchoutline =
 	  });
 	
 	  Item.prototype.insertChildrenBefore = function(children, referenceSibling, maintainIndentHack) {
-	    var childIndent, each, firstChild, i, isInOutline, j, k, l, lastChild, len, len1, mutation, outline, previousSibling, ref, ref1;
+	    var childIndent, each, firstChild, i, isInOutline, j, k, l, lastChild, len, len1, mutation, outline, previousSibling, recordedUndoableChanges, ref, ref1;
 	    if (maintainIndentHack == null) {
 	      maintainIndentHack = false;
 	    }
@@ -15891,10 +16349,13 @@ var birchoutline =
 	    if (!children.length) {
 	      return;
 	    }
+	    recordedUndoableChanges = this.recordedUndoableChanges;
 	    isInOutline = this.isInOutline;
 	    outline = this.outline;
 	    if (isInOutline) {
 	      outline.beginChanges();
+	    }
+	    if (recordedUndoableChanges) {
 	      outline.undoManager.beginUndoGrouping();
 	    }
 	    Item.removeItemsFromParents(children);
@@ -15904,9 +16365,11 @@ var birchoutline =
 	    } else {
 	      previousSibling = this.lastChild;
 	    }
-	    if (isInOutline) {
+	    if (isInOutline || recordedUndoableChanges) {
 	      mutation = Mutation.createChildrenMutation(this, children, [], previousSibling, referenceSibling);
-	      outline.willChange(mutation);
+	      if (isInOutline) {
+	        outline.willChange(mutation);
+	      }
 	      outline.recordChange(mutation);
 	    }
 	    for (i = j = 0, len = children.length; j < len; i = ++j) {
@@ -15940,13 +16403,16 @@ var birchoutline =
 	        each.indent = childIndent;
 	      }
 	    }
+	    if (recordedUndoableChanges) {
+	      outline.undoManager.endUndoGrouping();
+	    }
+	    this.clearCachedBranchContentID();
 	    if (isInOutline) {
 	      for (l = 0, len1 = children.length; l < len1; l++) {
 	        each = children[l];
 	        each.isInOutline = true;
 	      }
 	      outline.didChange(mutation);
-	      outline.undoManager.endUndoGrouping();
 	      return outline.endChanges();
 	    }
 	  };
@@ -15956,13 +16422,14 @@ var birchoutline =
 	  };
 	
 	  Item.prototype.removeChildren = function(children) {
-	    var depth, each, eachIndent, firstChild, isInOutline, j, lastChild, len, mutation, nextSibling, outline, previousSibling;
+	    var depth, each, eachIndent, firstChild, isInOutline, j, lastChild, len, mutation, nextSibling, outline, previousSibling, recordedUndoableChanges;
 	    if (!Array.isArray(children)) {
 	      children = [children];
 	    }
 	    if (!children.length) {
 	      return;
 	    }
+	    recordedUndoableChanges = this.recordedUndoableChanges;
 	    isInOutline = this.isInOutline;
 	    outline = this.outline;
 	    firstChild = children[0];
@@ -15970,10 +16437,16 @@ var birchoutline =
 	    previousSibling = firstChild.previousSibling;
 	    nextSibling = lastChild.nextSibling;
 	    if (isInOutline) {
-	      mutation = Mutation.createChildrenMutation(this, [], children, previousSibling, nextSibling);
-	      outline.willChange(mutation);
 	      outline.beginChanges();
+	    }
+	    if (recordedUndoableChanges) {
 	      outline.undoManager.beginUndoGrouping();
+	    }
+	    if (isInOutline || recordedUndoableChanges) {
+	      mutation = Mutation.createChildrenMutation(this, [], children, previousSibling, nextSibling);
+	      if (isInOutline) {
+	        outline.willChange(mutation);
+	      }
 	      outline.recordChange(mutation);
 	    }
 	    if (previousSibling != null) {
@@ -15999,9 +16472,12 @@ var birchoutline =
 	      each.parent = null;
 	      each.indent = eachIndent + depth;
 	    }
+	    if (recordedUndoableChanges) {
+	      outline.undoManager.endUndoGrouping();
+	    }
+	    this.clearCachedBranchContentID();
 	    if (isInOutline) {
 	      outline.didChange(mutation);
-	      outline.undoManager.endUndoGrouping();
 	      return outline.endChanges();
 	    }
 	  };
@@ -16075,7 +16551,7 @@ var birchoutline =
 	  };
 	
 	  Item.prototype.setAttribute = function(name, value) {
-	    var isInOutline, mutation, oldValue, outline, undoManager;
+	    var isInOutline, mutation, oldValue, outline, recordedUndoableChanges, undoManager;
 	    assert(name !== 'id', 'id is reserved attribute name');
 	    if (value) {
 	      value = Item.objectToAttributeValueString(value);
@@ -16086,11 +16562,16 @@ var birchoutline =
 	    }
 	    outline = this.outline;
 	    undoManager = outline.undoManager;
+	    recordedUndoableChanges = this.recordedUndoableChanges;
 	    isInOutline = this.isInOutline;
 	    if (isInOutline) {
-	      mutation = Mutation.createAttributeMutation(this, name, oldValue);
-	      outline.willChange(mutation);
 	      outline.beginChanges();
+	    }
+	    if (isInOutline || recordedUndoableChanges) {
+	      mutation = Mutation.createAttributeMutation(this, name, oldValue);
+	      if (isInOutline) {
+	        outline.willChange(mutation);
+	      }
 	      outline.recordChange(mutation);
 	      undoManager.disableUndoRegistration();
 	    }
@@ -16108,6 +16589,8 @@ var birchoutline =
 	    if (isInOutline) {
 	      outline.didChange(mutation);
 	      outline.endChanges();
+	    }
+	    if (isInOutline || recordedUndoableChanges) {
 	      return undoManager.enableUndoRegistration();
 	    }
 	  };
@@ -16119,11 +16602,14 @@ var birchoutline =
 	  };
 	
 	  Item.attributeValueStringToObject = function(value, clazz) {
+	    var ref;
 	    switch (clazz) {
 	      case Number:
+	      case 'Number':
 	        return parseFloat(value);
 	      case Date:
-	        return DateTime.parse(value);
+	      case 'Date':
+	        return (ref = DateTime.parse(value)) != null ? ref : '';
 	      default:
 	        return value;
 	    }
@@ -16188,6 +16674,18 @@ var birchoutline =
 	        return this.bodyString.substr(range.location, range.length);
 	      } else {
 	        return this.bodyString;
+	      }
+	    },
+	    set: function(text) {
+	      var range;
+	      if (text == null) {
+	        text = '';
+	      }
+	      range = {};
+	      if (this.bodyHighlightedAttributedString.getFirstOccuranceOfAttribute('content', null, range) != null) {
+	        return this.replaceBodyRange(range.location, range.length, text);
+	      } else {
+	        return this.bodyString = text;
 	      }
 	    }
 	  });
@@ -16282,7 +16780,7 @@ var birchoutline =
 	  Item.prototype.insertImageInBody = function(index, image) {};
 	
 	  Item.prototype.replaceBodyRange = function(location, length, insertedText) {
-	    var bodyAttributedString, insertedString, isInOutline, mutation, oldBody, outline, replacedText, undoManager;
+	    var bodyAttributedString, insertedString, isInOutline, mutation, oldBody, outline, recordedUndoableChanges, replacedText, undoManager;
 	    if (this.isOutlineRoot) {
 	      return;
 	    }
@@ -16296,28 +16794,38 @@ var birchoutline =
 	    }
 	    bodyAttributedString = this.bodyAttributedString;
 	    oldBody = bodyAttributedString.getString();
+	    recordedUndoableChanges = this.recordedUndoableChanges;
 	    isInOutline = this.isInOutline;
 	    outline = this.outline;
 	    undoManager = outline.undoManager;
 	    assert(insertedString.indexOf('\n') === -1, 'Item body text cannot contain newlines');
 	    assert(location + length <= oldBody.length, 'Replace range end must not be greater then body text');
-	    if (isInOutline) {
+	    if (isInOutline || recordedUndoableChanges) {
 	      replacedText = bodyAttributedString.attributedSubstringFromRange(location, length);
 	      if (replacedText.length === 0 && insertedText.length === 0) {
 	        return;
 	      }
 	      mutation = Mutation.createBodyMutation(this, location, insertedString.length, replacedText);
+	    }
+	    if (isInOutline) {
 	      outline.willChange(mutation);
 	      outline.beginChanges();
+	    }
+	    if (mutation) {
 	      outline.recordChange(mutation);
+	    }
+	    if (recordedUndoableChanges) {
 	      undoManager.disableUndoRegistration();
 	    }
 	    bodyAttributedString.replaceRange(location, length, insertedText);
 	    this.bodyHighlighted = null;
 	    outline.itemDidChangeBody(this, oldBody);
+	    this.clearCachedBranchContentID();
 	    if (isInOutline) {
 	      outline.didChange(mutation);
 	      outline.endChanges();
+	    }
+	    if (recordedUndoableChanges) {
 	      return undoManager.enableUndoRegistration();
 	    }
 	  };
@@ -16375,42 +16883,74 @@ var birchoutline =
 
 /***/ },
 /* 76 */
+/***/ function(module, exports) {
+
+	module.exports = function(str) {
+	  var hash = 5381,
+	      i    = str.length
+	
+	  while(i)
+	    hash = (hash * 33) ^ str.charCodeAt(--i)
+	
+	  /* JavaScript does bitwise operations (like XOR, above) on 32-bit signed
+	   * integers. Since we want the results to be always positive, if the high bit
+	   * is set, unset it and add it back in through (64-bit IEEE) addition. */
+	  return hash >= 0 ? hash : (hash & 0x7FFFFFFF) + 0x80000000
+	}
+
+
+/***/ },
+/* 77 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var DateTime, DateTimeParser, moment;
 	
-	DateTimeParser = __webpack_require__(77);
+	DateTimeParser = __webpack_require__(78);
 	
-	moment = __webpack_require__(78);
+	moment = __webpack_require__(79);
 	
 	module.exports = DateTime = (function() {
 	  function DateTime() {}
 	
 	  DateTime.parse = function(string) {
-	    var e, error;
+	    var e, m;
 	    try {
 	      return DateTimeParser.parse(string, {
 	        moment: moment
 	      }).toDate();
 	    } catch (error) {
 	      e = error;
-	      return new Date(string);
+	      m = moment(string, moment.ISO_8601, true);
+	      if (m.isValid()) {
+	        return m.toDate();
+	      } else {
+	        return null;
+	      }
 	    }
 	  };
 	
-	  DateTime.format = function(dateOrString) {
-	    var e, error, m;
+	  DateTime.format = function(dateOrString, showMillisecondsIfNeeded, showSecondsIfNeeded) {
+	    var e, m;
+	    if (showMillisecondsIfNeeded == null) {
+	      showMillisecondsIfNeeded = true;
+	    }
+	    if (showSecondsIfNeeded == null) {
+	      showSecondsIfNeeded = true;
+	    }
 	    try {
 	      m = DateTimeParser.parse(dateOrString, {
 	        moment: moment
 	      });
 	    } catch (error) {
 	      e = error;
-	      m = moment(dateOrString);
+	      m = moment(dateOrString, moment.ISO_8601, true);
+	      if (!m.isValid()) {
+	        return 'invalid date';
+	      }
 	    }
-	    if (m.milliseconds()) {
+	    if (m.milliseconds() && showMillisecondsIfNeeded) {
 	      return m.format('YYYY-MM-DD HH:mm:ss:SSS');
-	    } else if (m.seconds()) {
+	    } else if (m.seconds() && showSecondsIfNeeded) {
 	      return m.format('YYYY-MM-DD HH:mm:ss');
 	    } else if (m.hours() || m.minutes()) {
 	      return m.format('YYYY-MM-DD HH:mm');
@@ -16425,7 +16965,7 @@ var birchoutline =
 
 
 /***/ },
-/* 77 */
+/* 78 */
 /***/ function(module, exports) {
 
 	module.exports = (function() {
@@ -19094,11 +19634,11 @@ var birchoutline =
 
 
 /***/ },
-/* 78 */
+/* 79 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(module) {//! moment.js
-	//! version : 2.13.0
+	//! version : 2.15.2
 	//! authors : Tim Wood, Iskren Chernev, Moment.js contributors
 	//! license : MIT
 	//! momentjs.com
@@ -19123,6 +19663,21 @@ var birchoutline =
 	
 	    function isArray(input) {
 	        return input instanceof Array || Object.prototype.toString.call(input) === '[object Array]';
+	    }
+	
+	    function isObject(input) {
+	        // IE8 will treat undefined and null as object if it wasn't for
+	        // input != null
+	        return input != null && Object.prototype.toString.call(input) === '[object Object]';
+	    }
+	
+	    function isObjectEmpty(obj) {
+	        var k;
+	        for (k in obj) {
+	            // even if its not own property I'd still call it non-empty
+	            return false;
+	        }
+	        return true;
 	    }
 	
 	    function isDate(input) {
@@ -19212,7 +19767,7 @@ var birchoutline =
 	            var parsedParts = some.call(flags.parsedDateParts, function (i) {
 	                return i != null;
 	            });
-	            m._isValid = !isNaN(m._d.getTime()) &&
+	            var isNowValid = !isNaN(m._d.getTime()) &&
 	                flags.overflow < 0 &&
 	                !flags.empty &&
 	                !flags.invalidMonth &&
@@ -19223,10 +19778,17 @@ var birchoutline =
 	                (!flags.meridiem || (flags.meridiem && parsedParts));
 	
 	            if (m._strict) {
-	                m._isValid = m._isValid &&
+	                isNowValid = isNowValid &&
 	                    flags.charsLeftOver === 0 &&
 	                    flags.unusedTokens.length === 0 &&
 	                    flags.bigHour === undefined;
+	            }
+	
+	            if (Object.isFrozen == null || !Object.isFrozen(m)) {
+	                m._isValid = isNowValid;
+	            }
+	            else {
+	                return isNowValid;
 	            }
 	        }
 	        return m._isValid;
@@ -19320,7 +19882,8 @@ var birchoutline =
 	
 	    function absFloor (number) {
 	        if (number < 0) {
-	            return Math.ceil(number);
+	            // -0 -> 0
+	            return Math.ceil(number) || 0;
 	        } else {
 	            return Math.floor(number);
 	        }
@@ -19367,7 +19930,22 @@ var birchoutline =
 	                utils_hooks__hooks.deprecationHandler(null, msg);
 	            }
 	            if (firstTime) {
-	                warn(msg + '\nArguments: ' + Array.prototype.slice.call(arguments).join(', ') + '\n' + (new Error()).stack);
+	                var args = [];
+	                var arg;
+	                for (var i = 0; i < arguments.length; i++) {
+	                    arg = '';
+	                    if (typeof arguments[i] === 'object') {
+	                        arg += '\n[' + i + '] ';
+	                        for (var key in arguments[0]) {
+	                            arg += key + ': ' + arguments[0][key] + ', ';
+	                        }
+	                        arg = arg.slice(0, -2); // Remove trailing comma and space
+	                    } else {
+	                        arg = arguments[i];
+	                    }
+	                    args.push(arg);
+	                }
+	                warn(msg + '\nArguments: ' + Array.prototype.slice.call(args).join('') + '\n' + (new Error()).stack);
 	                firstTime = false;
 	            }
 	            return fn.apply(this, arguments);
@@ -19391,10 +19969,6 @@ var birchoutline =
 	
 	    function isFunction(input) {
 	        return input instanceof Function || Object.prototype.toString.call(input) === '[object Function]';
-	    }
-	
-	    function isObject(input) {
-	        return Object.prototype.toString.call(input) === '[object Object]';
 	    }
 	
 	    function locale_set__set (config) {
@@ -19428,6 +20002,14 @@ var birchoutline =
 	                }
 	            }
 	        }
+	        for (prop in parentConfig) {
+	            if (hasOwnProp(parentConfig, prop) &&
+	                    !hasOwnProp(childConfig, prop) &&
+	                    isObject(parentConfig[prop])) {
+	                // make sure changes to properties don't modify parent config
+	                res[prop] = extend({}, res[prop]);
+	            }
+	        }
 	        return res;
 	    }
 	
@@ -19453,161 +20035,83 @@ var birchoutline =
 	        };
 	    }
 	
-	    // internal storage for locale config files
-	    var locales = {};
-	    var globalLocale;
+	    var defaultCalendar = {
+	        sameDay : '[Today at] LT',
+	        nextDay : '[Tomorrow at] LT',
+	        nextWeek : 'dddd [at] LT',
+	        lastDay : '[Yesterday at] LT',
+	        lastWeek : '[Last] dddd [at] LT',
+	        sameElse : 'L'
+	    };
 	
-	    function normalizeLocale(key) {
-	        return key ? key.toLowerCase().replace('_', '-') : key;
+	    function locale_calendar__calendar (key, mom, now) {
+	        var output = this._calendar[key] || this._calendar['sameElse'];
+	        return isFunction(output) ? output.call(mom, now) : output;
 	    }
 	
-	    // pick the locale from the array
-	    // try ['en-au', 'en-gb'] as 'en-au', 'en-gb', 'en', as in move through the list trying each
-	    // substring from most specific to least, but move to the next array item if it's a more specific variant than the current root
-	    function chooseLocale(names) {
-	        var i = 0, j, next, locale, split;
+	    var defaultLongDateFormat = {
+	        LTS  : 'h:mm:ss A',
+	        LT   : 'h:mm A',
+	        L    : 'MM/DD/YYYY',
+	        LL   : 'MMMM D, YYYY',
+	        LLL  : 'MMMM D, YYYY h:mm A',
+	        LLLL : 'dddd, MMMM D, YYYY h:mm A'
+	    };
 	
-	        while (i < names.length) {
-	            split = normalizeLocale(names[i]).split('-');
-	            j = split.length;
-	            next = normalizeLocale(names[i + 1]);
-	            next = next ? next.split('-') : null;
-	            while (j > 0) {
-	                locale = loadLocale(split.slice(0, j).join('-'));
-	                if (locale) {
-	                    return locale;
-	                }
-	                if (next && next.length >= j && compareArrays(split, next, true) >= j - 1) {
-	                    //the next array item is better than a shallower substring of this one
-	                    break;
-	                }
-	                j--;
-	            }
-	            i++;
+	    function longDateFormat (key) {
+	        var format = this._longDateFormat[key],
+	            formatUpper = this._longDateFormat[key.toUpperCase()];
+	
+	        if (format || !formatUpper) {
+	            return format;
 	        }
-	        return null;
+	
+	        this._longDateFormat[key] = formatUpper.replace(/MMMM|MM|DD|dddd/g, function (val) {
+	            return val.slice(1);
+	        });
+	
+	        return this._longDateFormat[key];
 	    }
 	
-	    function loadLocale(name) {
-	        var oldLocale = null;
-	        // TODO: Find a better way to register and load all the locales in Node
-	        if (!locales[name] && (typeof module !== 'undefined') &&
-	                module && module.exports) {
-	            try {
-	                oldLocale = globalLocale._abbr;
-	                __webpack_require__(80)("./" + name);
-	                // because defineLocale currently also sets the global locale, we
-	                // want to undo that for lazy loaded locales
-	                locale_locales__getSetGlobalLocale(oldLocale);
-	            } catch (e) { }
-	        }
-	        return locales[name];
+	    var defaultInvalidDate = 'Invalid date';
+	
+	    function invalidDate () {
+	        return this._invalidDate;
 	    }
 	
-	    // This function will load locale and then set the global locale.  If
-	    // no arguments are passed in, it will simply return the current global
-	    // locale key.
-	    function locale_locales__getSetGlobalLocale (key, values) {
-	        var data;
-	        if (key) {
-	            if (isUndefined(values)) {
-	                data = locale_locales__getLocale(key);
-	            }
-	            else {
-	                data = defineLocale(key, values);
-	            }
+	    var defaultOrdinal = '%d';
+	    var defaultOrdinalParse = /\d{1,2}/;
 	
-	            if (data) {
-	                // moment.duration._locale = moment._locale = data;
-	                globalLocale = data;
-	            }
-	        }
-	
-	        return globalLocale._abbr;
+	    function ordinal (number) {
+	        return this._ordinal.replace('%d', number);
 	    }
 	
-	    function defineLocale (name, config) {
-	        if (config !== null) {
-	            config.abbr = name;
-	            if (locales[name] != null) {
-	                deprecateSimple('defineLocaleOverride',
-	                        'use moment.updateLocale(localeName, config) to change ' +
-	                        'an existing locale. moment.defineLocale(localeName, ' +
-	                        'config) should only be used for creating a new locale');
-	                config = mergeConfigs(locales[name]._config, config);
-	            } else if (config.parentLocale != null) {
-	                if (locales[config.parentLocale] != null) {
-	                    config = mergeConfigs(locales[config.parentLocale]._config, config);
-	                } else {
-	                    // treat as if there is no base config
-	                    deprecateSimple('parentLocaleUndefined',
-	                            'specified parentLocale is not defined yet');
-	                }
-	            }
-	            locales[name] = new Locale(config);
+	    var defaultRelativeTime = {
+	        future : 'in %s',
+	        past   : '%s ago',
+	        s  : 'a few seconds',
+	        m  : 'a minute',
+	        mm : '%d minutes',
+	        h  : 'an hour',
+	        hh : '%d hours',
+	        d  : 'a day',
+	        dd : '%d days',
+	        M  : 'a month',
+	        MM : '%d months',
+	        y  : 'a year',
+	        yy : '%d years'
+	    };
 	
-	            // backwards compat for now: also set the locale
-	            locale_locales__getSetGlobalLocale(name);
-	
-	            return locales[name];
-	        } else {
-	            // useful for testing
-	            delete locales[name];
-	            return null;
-	        }
+	    function relative__relativeTime (number, withoutSuffix, string, isFuture) {
+	        var output = this._relativeTime[string];
+	        return (isFunction(output)) ?
+	            output(number, withoutSuffix, string, isFuture) :
+	            output.replace(/%d/i, number);
 	    }
 	
-	    function updateLocale(name, config) {
-	        if (config != null) {
-	            var locale;
-	            if (locales[name] != null) {
-	                config = mergeConfigs(locales[name]._config, config);
-	            }
-	            locale = new Locale(config);
-	            locale.parentLocale = locales[name];
-	            locales[name] = locale;
-	
-	            // backwards compat for now: also set the locale
-	            locale_locales__getSetGlobalLocale(name);
-	        } else {
-	            // pass null for config to unupdate, useful for tests
-	            if (locales[name] != null) {
-	                if (locales[name].parentLocale != null) {
-	                    locales[name] = locales[name].parentLocale;
-	                } else if (locales[name] != null) {
-	                    delete locales[name];
-	                }
-	            }
-	        }
-	        return locales[name];
-	    }
-	
-	    // returns locale data
-	    function locale_locales__getLocale (key) {
-	        var locale;
-	
-	        if (key && key._locale && key._locale._abbr) {
-	            key = key._locale._abbr;
-	        }
-	
-	        if (!key) {
-	            return globalLocale;
-	        }
-	
-	        if (!isArray(key)) {
-	            //short-circuit everything else
-	            locale = loadLocale(key);
-	            if (locale) {
-	                return locale;
-	            }
-	            key = [key];
-	        }
-	
-	        return chooseLocale(key);
-	    }
-	
-	    function locale_locales__listLocales() {
-	        return keys(locales);
+	    function pastFuture (diff, output) {
+	        var format = this._relativeTime[diff > 0 ? 'future' : 'past'];
+	        return isFunction(format) ? format(output) : format.replace(/%s/i, output);
 	    }
 	
 	    var aliases = {};
@@ -19638,6 +20142,23 @@ var birchoutline =
 	        return normalizedInput;
 	    }
 	
+	    var priorities = {};
+	
+	    function addUnitPriority(unit, priority) {
+	        priorities[unit] = priority;
+	    }
+	
+	    function getPrioritizedUnits(unitsObj) {
+	        var units = [];
+	        for (var u in unitsObj) {
+	            units.push({unit: u, priority: priorities[u]});
+	        }
+	        units.sort(function (a, b) {
+	            return a.priority - b.priority;
+	        });
+	        return units;
+	    }
+	
 	    function makeGetSet (unit, keepTime) {
 	        return function (value) {
 	            if (value != null) {
@@ -19663,11 +20184,21 @@ var birchoutline =
 	
 	    // MOMENTS
 	
-	    function getSet (units, value) {
-	        var unit;
+	    function stringGet (units) {
+	        units = normalizeUnits(units);
+	        if (isFunction(this[units])) {
+	            return this[units]();
+	        }
+	        return this;
+	    }
+	
+	
+	    function stringSet (units, value) {
 	        if (typeof units === 'object') {
-	            for (unit in units) {
-	                this.set(unit, units[unit]);
+	            units = normalizeObjectUnits(units);
+	            var prioritized = getPrioritizedUnits(units);
+	            for (var i = 0; i < prioritized.length; i++) {
+	                this[prioritized[i].unit](units[prioritized[i].unit]);
 	            }
 	        } else {
 	            units = normalizeUnits(units);
@@ -19907,6 +20438,10 @@ var birchoutline =
 	
 	    addUnitAlias('month', 'M');
 	
+	    // PRIORITY
+	
+	    addUnitPriority('month', 8);
+	
 	    // PARSING
 	
 	    addRegexToken('M',    match1to2);
@@ -19934,15 +20469,21 @@ var birchoutline =
 	
 	    // LOCALES
 	
-	    var MONTHS_IN_FORMAT = /D[oD]?(\[[^\[\]]*\]|\s+)+MMMM?/;
+	    var MONTHS_IN_FORMAT = /D[oD]?(\[[^\[\]]*\]|\s)+MMMM?/;
 	    var defaultLocaleMonths = 'January_February_March_April_May_June_July_August_September_October_November_December'.split('_');
 	    function localeMonths (m, format) {
+	        if (!m) {
+	            return this._months;
+	        }
 	        return isArray(this._months) ? this._months[m.month()] :
-	            this._months[MONTHS_IN_FORMAT.test(format) ? 'format' : 'standalone'][m.month()];
+	            this._months[(this._months.isFormat || MONTHS_IN_FORMAT).test(format) ? 'format' : 'standalone'][m.month()];
 	    }
 	
 	    var defaultLocaleMonthsShort = 'Jan_Feb_Mar_Apr_May_Jun_Jul_Aug_Sep_Oct_Nov_Dec'.split('_');
 	    function localeMonthsShort (m, format) {
+	        if (!m) {
+	            return this._monthsShort;
+	        }
 	        return isArray(this._monthsShort) ? this._monthsShort[m.month()] :
 	            this._monthsShort[MONTHS_IN_FORMAT.test(format) ? 'format' : 'standalone'][m.month()];
 	    }
@@ -20079,6 +20620,9 @@ var birchoutline =
 	                return this._monthsShortRegex;
 	            }
 	        } else {
+	            if (!hasOwnProp(this, '_monthsShortRegex')) {
+	                this._monthsShortRegex = defaultMonthsShortRegex;
+	            }
 	            return this._monthsShortStrictRegex && isStrict ?
 	                this._monthsShortStrictRegex : this._monthsShortRegex;
 	        }
@@ -20096,6 +20640,9 @@ var birchoutline =
 	                return this._monthsRegex;
 	            }
 	        } else {
+	            if (!hasOwnProp(this, '_monthsRegex')) {
+	                this._monthsRegex = defaultMonthsRegex;
+	            }
 	            return this._monthsStrictRegex && isStrict ?
 	                this._monthsStrictRegex : this._monthsRegex;
 	        }
@@ -20124,6 +20671,8 @@ var birchoutline =
 	        for (i = 0; i < 12; i++) {
 	            shortPieces[i] = regexEscape(shortPieces[i]);
 	            longPieces[i] = regexEscape(longPieces[i]);
+	        }
+	        for (i = 0; i < 24; i++) {
 	            mixedPieces[i] = regexEscape(mixedPieces[i]);
 	        }
 	
@@ -20131,6 +20680,876 @@ var birchoutline =
 	        this._monthsShortRegex = this._monthsRegex;
 	        this._monthsStrictRegex = new RegExp('^(' + longPieces.join('|') + ')', 'i');
 	        this._monthsShortStrictRegex = new RegExp('^(' + shortPieces.join('|') + ')', 'i');
+	    }
+	
+	    // FORMATTING
+	
+	    addFormatToken('Y', 0, 0, function () {
+	        var y = this.year();
+	        return y <= 9999 ? '' + y : '+' + y;
+	    });
+	
+	    addFormatToken(0, ['YY', 2], 0, function () {
+	        return this.year() % 100;
+	    });
+	
+	    addFormatToken(0, ['YYYY',   4],       0, 'year');
+	    addFormatToken(0, ['YYYYY',  5],       0, 'year');
+	    addFormatToken(0, ['YYYYYY', 6, true], 0, 'year');
+	
+	    // ALIASES
+	
+	    addUnitAlias('year', 'y');
+	
+	    // PRIORITIES
+	
+	    addUnitPriority('year', 1);
+	
+	    // PARSING
+	
+	    addRegexToken('Y',      matchSigned);
+	    addRegexToken('YY',     match1to2, match2);
+	    addRegexToken('YYYY',   match1to4, match4);
+	    addRegexToken('YYYYY',  match1to6, match6);
+	    addRegexToken('YYYYYY', match1to6, match6);
+	
+	    addParseToken(['YYYYY', 'YYYYYY'], YEAR);
+	    addParseToken('YYYY', function (input, array) {
+	        array[YEAR] = input.length === 2 ? utils_hooks__hooks.parseTwoDigitYear(input) : toInt(input);
+	    });
+	    addParseToken('YY', function (input, array) {
+	        array[YEAR] = utils_hooks__hooks.parseTwoDigitYear(input);
+	    });
+	    addParseToken('Y', function (input, array) {
+	        array[YEAR] = parseInt(input, 10);
+	    });
+	
+	    // HELPERS
+	
+	    function daysInYear(year) {
+	        return isLeapYear(year) ? 366 : 365;
+	    }
+	
+	    function isLeapYear(year) {
+	        return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+	    }
+	
+	    // HOOKS
+	
+	    utils_hooks__hooks.parseTwoDigitYear = function (input) {
+	        return toInt(input) + (toInt(input) > 68 ? 1900 : 2000);
+	    };
+	
+	    // MOMENTS
+	
+	    var getSetYear = makeGetSet('FullYear', true);
+	
+	    function getIsLeapYear () {
+	        return isLeapYear(this.year());
+	    }
+	
+	    function createDate (y, m, d, h, M, s, ms) {
+	        //can't just apply() to create a date:
+	        //http://stackoverflow.com/questions/181348/instantiating-a-javascript-object-by-calling-prototype-constructor-apply
+	        var date = new Date(y, m, d, h, M, s, ms);
+	
+	        //the date constructor remaps years 0-99 to 1900-1999
+	        if (y < 100 && y >= 0 && isFinite(date.getFullYear())) {
+	            date.setFullYear(y);
+	        }
+	        return date;
+	    }
+	
+	    function createUTCDate (y) {
+	        var date = new Date(Date.UTC.apply(null, arguments));
+	
+	        //the Date.UTC function remaps years 0-99 to 1900-1999
+	        if (y < 100 && y >= 0 && isFinite(date.getUTCFullYear())) {
+	            date.setUTCFullYear(y);
+	        }
+	        return date;
+	    }
+	
+	    // start-of-first-week - start-of-year
+	    function firstWeekOffset(year, dow, doy) {
+	        var // first-week day -- which january is always in the first week (4 for iso, 1 for other)
+	            fwd = 7 + dow - doy,
+	            // first-week day local weekday -- which local weekday is fwd
+	            fwdlw = (7 + createUTCDate(year, 0, fwd).getUTCDay() - dow) % 7;
+	
+	        return -fwdlw + fwd - 1;
+	    }
+	
+	    //http://en.wikipedia.org/wiki/ISO_week_date#Calculating_a_date_given_the_year.2C_week_number_and_weekday
+	    function dayOfYearFromWeeks(year, week, weekday, dow, doy) {
+	        var localWeekday = (7 + weekday - dow) % 7,
+	            weekOffset = firstWeekOffset(year, dow, doy),
+	            dayOfYear = 1 + 7 * (week - 1) + localWeekday + weekOffset,
+	            resYear, resDayOfYear;
+	
+	        if (dayOfYear <= 0) {
+	            resYear = year - 1;
+	            resDayOfYear = daysInYear(resYear) + dayOfYear;
+	        } else if (dayOfYear > daysInYear(year)) {
+	            resYear = year + 1;
+	            resDayOfYear = dayOfYear - daysInYear(year);
+	        } else {
+	            resYear = year;
+	            resDayOfYear = dayOfYear;
+	        }
+	
+	        return {
+	            year: resYear,
+	            dayOfYear: resDayOfYear
+	        };
+	    }
+	
+	    function weekOfYear(mom, dow, doy) {
+	        var weekOffset = firstWeekOffset(mom.year(), dow, doy),
+	            week = Math.floor((mom.dayOfYear() - weekOffset - 1) / 7) + 1,
+	            resWeek, resYear;
+	
+	        if (week < 1) {
+	            resYear = mom.year() - 1;
+	            resWeek = week + weeksInYear(resYear, dow, doy);
+	        } else if (week > weeksInYear(mom.year(), dow, doy)) {
+	            resWeek = week - weeksInYear(mom.year(), dow, doy);
+	            resYear = mom.year() + 1;
+	        } else {
+	            resYear = mom.year();
+	            resWeek = week;
+	        }
+	
+	        return {
+	            week: resWeek,
+	            year: resYear
+	        };
+	    }
+	
+	    function weeksInYear(year, dow, doy) {
+	        var weekOffset = firstWeekOffset(year, dow, doy),
+	            weekOffsetNext = firstWeekOffset(year + 1, dow, doy);
+	        return (daysInYear(year) - weekOffset + weekOffsetNext) / 7;
+	    }
+	
+	    // FORMATTING
+	
+	    addFormatToken('w', ['ww', 2], 'wo', 'week');
+	    addFormatToken('W', ['WW', 2], 'Wo', 'isoWeek');
+	
+	    // ALIASES
+	
+	    addUnitAlias('week', 'w');
+	    addUnitAlias('isoWeek', 'W');
+	
+	    // PRIORITIES
+	
+	    addUnitPriority('week', 5);
+	    addUnitPriority('isoWeek', 5);
+	
+	    // PARSING
+	
+	    addRegexToken('w',  match1to2);
+	    addRegexToken('ww', match1to2, match2);
+	    addRegexToken('W',  match1to2);
+	    addRegexToken('WW', match1to2, match2);
+	
+	    addWeekParseToken(['w', 'ww', 'W', 'WW'], function (input, week, config, token) {
+	        week[token.substr(0, 1)] = toInt(input);
+	    });
+	
+	    // HELPERS
+	
+	    // LOCALES
+	
+	    function localeWeek (mom) {
+	        return weekOfYear(mom, this._week.dow, this._week.doy).week;
+	    }
+	
+	    var defaultLocaleWeek = {
+	        dow : 0, // Sunday is the first day of the week.
+	        doy : 6  // The week that contains Jan 1st is the first week of the year.
+	    };
+	
+	    function localeFirstDayOfWeek () {
+	        return this._week.dow;
+	    }
+	
+	    function localeFirstDayOfYear () {
+	        return this._week.doy;
+	    }
+	
+	    // MOMENTS
+	
+	    function getSetWeek (input) {
+	        var week = this.localeData().week(this);
+	        return input == null ? week : this.add((input - week) * 7, 'd');
+	    }
+	
+	    function getSetISOWeek (input) {
+	        var week = weekOfYear(this, 1, 4).week;
+	        return input == null ? week : this.add((input - week) * 7, 'd');
+	    }
+	
+	    // FORMATTING
+	
+	    addFormatToken('d', 0, 'do', 'day');
+	
+	    addFormatToken('dd', 0, 0, function (format) {
+	        return this.localeData().weekdaysMin(this, format);
+	    });
+	
+	    addFormatToken('ddd', 0, 0, function (format) {
+	        return this.localeData().weekdaysShort(this, format);
+	    });
+	
+	    addFormatToken('dddd', 0, 0, function (format) {
+	        return this.localeData().weekdays(this, format);
+	    });
+	
+	    addFormatToken('e', 0, 0, 'weekday');
+	    addFormatToken('E', 0, 0, 'isoWeekday');
+	
+	    // ALIASES
+	
+	    addUnitAlias('day', 'd');
+	    addUnitAlias('weekday', 'e');
+	    addUnitAlias('isoWeekday', 'E');
+	
+	    // PRIORITY
+	    addUnitPriority('day', 11);
+	    addUnitPriority('weekday', 11);
+	    addUnitPriority('isoWeekday', 11);
+	
+	    // PARSING
+	
+	    addRegexToken('d',    match1to2);
+	    addRegexToken('e',    match1to2);
+	    addRegexToken('E',    match1to2);
+	    addRegexToken('dd',   function (isStrict, locale) {
+	        return locale.weekdaysMinRegex(isStrict);
+	    });
+	    addRegexToken('ddd',   function (isStrict, locale) {
+	        return locale.weekdaysShortRegex(isStrict);
+	    });
+	    addRegexToken('dddd',   function (isStrict, locale) {
+	        return locale.weekdaysRegex(isStrict);
+	    });
+	
+	    addWeekParseToken(['dd', 'ddd', 'dddd'], function (input, week, config, token) {
+	        var weekday = config._locale.weekdaysParse(input, token, config._strict);
+	        // if we didn't get a weekday name, mark the date as invalid
+	        if (weekday != null) {
+	            week.d = weekday;
+	        } else {
+	            getParsingFlags(config).invalidWeekday = input;
+	        }
+	    });
+	
+	    addWeekParseToken(['d', 'e', 'E'], function (input, week, config, token) {
+	        week[token] = toInt(input);
+	    });
+	
+	    // HELPERS
+	
+	    function parseWeekday(input, locale) {
+	        if (typeof input !== 'string') {
+	            return input;
+	        }
+	
+	        if (!isNaN(input)) {
+	            return parseInt(input, 10);
+	        }
+	
+	        input = locale.weekdaysParse(input);
+	        if (typeof input === 'number') {
+	            return input;
+	        }
+	
+	        return null;
+	    }
+	
+	    function parseIsoWeekday(input, locale) {
+	        if (typeof input === 'string') {
+	            return locale.weekdaysParse(input) % 7 || 7;
+	        }
+	        return isNaN(input) ? null : input;
+	    }
+	
+	    // LOCALES
+	
+	    var defaultLocaleWeekdays = 'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split('_');
+	    function localeWeekdays (m, format) {
+	        if (!m) {
+	            return this._weekdays;
+	        }
+	        return isArray(this._weekdays) ? this._weekdays[m.day()] :
+	            this._weekdays[this._weekdays.isFormat.test(format) ? 'format' : 'standalone'][m.day()];
+	    }
+	
+	    var defaultLocaleWeekdaysShort = 'Sun_Mon_Tue_Wed_Thu_Fri_Sat'.split('_');
+	    function localeWeekdaysShort (m) {
+	        return (m) ? this._weekdaysShort[m.day()] : this._weekdaysShort;
+	    }
+	
+	    var defaultLocaleWeekdaysMin = 'Su_Mo_Tu_We_Th_Fr_Sa'.split('_');
+	    function localeWeekdaysMin (m) {
+	        return (m) ? this._weekdaysMin[m.day()] : this._weekdaysMin;
+	    }
+	
+	    function day_of_week__handleStrictParse(weekdayName, format, strict) {
+	        var i, ii, mom, llc = weekdayName.toLocaleLowerCase();
+	        if (!this._weekdaysParse) {
+	            this._weekdaysParse = [];
+	            this._shortWeekdaysParse = [];
+	            this._minWeekdaysParse = [];
+	
+	            for (i = 0; i < 7; ++i) {
+	                mom = create_utc__createUTC([2000, 1]).day(i);
+	                this._minWeekdaysParse[i] = this.weekdaysMin(mom, '').toLocaleLowerCase();
+	                this._shortWeekdaysParse[i] = this.weekdaysShort(mom, '').toLocaleLowerCase();
+	                this._weekdaysParse[i] = this.weekdays(mom, '').toLocaleLowerCase();
+	            }
+	        }
+	
+	        if (strict) {
+	            if (format === 'dddd') {
+	                ii = indexOf.call(this._weekdaysParse, llc);
+	                return ii !== -1 ? ii : null;
+	            } else if (format === 'ddd') {
+	                ii = indexOf.call(this._shortWeekdaysParse, llc);
+	                return ii !== -1 ? ii : null;
+	            } else {
+	                ii = indexOf.call(this._minWeekdaysParse, llc);
+	                return ii !== -1 ? ii : null;
+	            }
+	        } else {
+	            if (format === 'dddd') {
+	                ii = indexOf.call(this._weekdaysParse, llc);
+	                if (ii !== -1) {
+	                    return ii;
+	                }
+	                ii = indexOf.call(this._shortWeekdaysParse, llc);
+	                if (ii !== -1) {
+	                    return ii;
+	                }
+	                ii = indexOf.call(this._minWeekdaysParse, llc);
+	                return ii !== -1 ? ii : null;
+	            } else if (format === 'ddd') {
+	                ii = indexOf.call(this._shortWeekdaysParse, llc);
+	                if (ii !== -1) {
+	                    return ii;
+	                }
+	                ii = indexOf.call(this._weekdaysParse, llc);
+	                if (ii !== -1) {
+	                    return ii;
+	                }
+	                ii = indexOf.call(this._minWeekdaysParse, llc);
+	                return ii !== -1 ? ii : null;
+	            } else {
+	                ii = indexOf.call(this._minWeekdaysParse, llc);
+	                if (ii !== -1) {
+	                    return ii;
+	                }
+	                ii = indexOf.call(this._weekdaysParse, llc);
+	                if (ii !== -1) {
+	                    return ii;
+	                }
+	                ii = indexOf.call(this._shortWeekdaysParse, llc);
+	                return ii !== -1 ? ii : null;
+	            }
+	        }
+	    }
+	
+	    function localeWeekdaysParse (weekdayName, format, strict) {
+	        var i, mom, regex;
+	
+	        if (this._weekdaysParseExact) {
+	            return day_of_week__handleStrictParse.call(this, weekdayName, format, strict);
+	        }
+	
+	        if (!this._weekdaysParse) {
+	            this._weekdaysParse = [];
+	            this._minWeekdaysParse = [];
+	            this._shortWeekdaysParse = [];
+	            this._fullWeekdaysParse = [];
+	        }
+	
+	        for (i = 0; i < 7; i++) {
+	            // make the regex if we don't have it already
+	
+	            mom = create_utc__createUTC([2000, 1]).day(i);
+	            if (strict && !this._fullWeekdaysParse[i]) {
+	                this._fullWeekdaysParse[i] = new RegExp('^' + this.weekdays(mom, '').replace('.', '\.?') + '$', 'i');
+	                this._shortWeekdaysParse[i] = new RegExp('^' + this.weekdaysShort(mom, '').replace('.', '\.?') + '$', 'i');
+	                this._minWeekdaysParse[i] = new RegExp('^' + this.weekdaysMin(mom, '').replace('.', '\.?') + '$', 'i');
+	            }
+	            if (!this._weekdaysParse[i]) {
+	                regex = '^' + this.weekdays(mom, '') + '|^' + this.weekdaysShort(mom, '') + '|^' + this.weekdaysMin(mom, '');
+	                this._weekdaysParse[i] = new RegExp(regex.replace('.', ''), 'i');
+	            }
+	            // test the regex
+	            if (strict && format === 'dddd' && this._fullWeekdaysParse[i].test(weekdayName)) {
+	                return i;
+	            } else if (strict && format === 'ddd' && this._shortWeekdaysParse[i].test(weekdayName)) {
+	                return i;
+	            } else if (strict && format === 'dd' && this._minWeekdaysParse[i].test(weekdayName)) {
+	                return i;
+	            } else if (!strict && this._weekdaysParse[i].test(weekdayName)) {
+	                return i;
+	            }
+	        }
+	    }
+	
+	    // MOMENTS
+	
+	    function getSetDayOfWeek (input) {
+	        if (!this.isValid()) {
+	            return input != null ? this : NaN;
+	        }
+	        var day = this._isUTC ? this._d.getUTCDay() : this._d.getDay();
+	        if (input != null) {
+	            input = parseWeekday(input, this.localeData());
+	            return this.add(input - day, 'd');
+	        } else {
+	            return day;
+	        }
+	    }
+	
+	    function getSetLocaleDayOfWeek (input) {
+	        if (!this.isValid()) {
+	            return input != null ? this : NaN;
+	        }
+	        var weekday = (this.day() + 7 - this.localeData()._week.dow) % 7;
+	        return input == null ? weekday : this.add(input - weekday, 'd');
+	    }
+	
+	    function getSetISODayOfWeek (input) {
+	        if (!this.isValid()) {
+	            return input != null ? this : NaN;
+	        }
+	
+	        // behaves the same as moment#day except
+	        // as a getter, returns 7 instead of 0 (1-7 range instead of 0-6)
+	        // as a setter, sunday should belong to the previous week.
+	
+	        if (input != null) {
+	            var weekday = parseIsoWeekday(input, this.localeData());
+	            return this.day(this.day() % 7 ? weekday : weekday - 7);
+	        } else {
+	            return this.day() || 7;
+	        }
+	    }
+	
+	    var defaultWeekdaysRegex = matchWord;
+	    function weekdaysRegex (isStrict) {
+	        if (this._weekdaysParseExact) {
+	            if (!hasOwnProp(this, '_weekdaysRegex')) {
+	                computeWeekdaysParse.call(this);
+	            }
+	            if (isStrict) {
+	                return this._weekdaysStrictRegex;
+	            } else {
+	                return this._weekdaysRegex;
+	            }
+	        } else {
+	            if (!hasOwnProp(this, '_weekdaysRegex')) {
+	                this._weekdaysRegex = defaultWeekdaysRegex;
+	            }
+	            return this._weekdaysStrictRegex && isStrict ?
+	                this._weekdaysStrictRegex : this._weekdaysRegex;
+	        }
+	    }
+	
+	    var defaultWeekdaysShortRegex = matchWord;
+	    function weekdaysShortRegex (isStrict) {
+	        if (this._weekdaysParseExact) {
+	            if (!hasOwnProp(this, '_weekdaysRegex')) {
+	                computeWeekdaysParse.call(this);
+	            }
+	            if (isStrict) {
+	                return this._weekdaysShortStrictRegex;
+	            } else {
+	                return this._weekdaysShortRegex;
+	            }
+	        } else {
+	            if (!hasOwnProp(this, '_weekdaysShortRegex')) {
+	                this._weekdaysShortRegex = defaultWeekdaysShortRegex;
+	            }
+	            return this._weekdaysShortStrictRegex && isStrict ?
+	                this._weekdaysShortStrictRegex : this._weekdaysShortRegex;
+	        }
+	    }
+	
+	    var defaultWeekdaysMinRegex = matchWord;
+	    function weekdaysMinRegex (isStrict) {
+	        if (this._weekdaysParseExact) {
+	            if (!hasOwnProp(this, '_weekdaysRegex')) {
+	                computeWeekdaysParse.call(this);
+	            }
+	            if (isStrict) {
+	                return this._weekdaysMinStrictRegex;
+	            } else {
+	                return this._weekdaysMinRegex;
+	            }
+	        } else {
+	            if (!hasOwnProp(this, '_weekdaysMinRegex')) {
+	                this._weekdaysMinRegex = defaultWeekdaysMinRegex;
+	            }
+	            return this._weekdaysMinStrictRegex && isStrict ?
+	                this._weekdaysMinStrictRegex : this._weekdaysMinRegex;
+	        }
+	    }
+	
+	
+	    function computeWeekdaysParse () {
+	        function cmpLenRev(a, b) {
+	            return b.length - a.length;
+	        }
+	
+	        var minPieces = [], shortPieces = [], longPieces = [], mixedPieces = [],
+	            i, mom, minp, shortp, longp;
+	        for (i = 0; i < 7; i++) {
+	            // make the regex if we don't have it already
+	            mom = create_utc__createUTC([2000, 1]).day(i);
+	            minp = this.weekdaysMin(mom, '');
+	            shortp = this.weekdaysShort(mom, '');
+	            longp = this.weekdays(mom, '');
+	            minPieces.push(minp);
+	            shortPieces.push(shortp);
+	            longPieces.push(longp);
+	            mixedPieces.push(minp);
+	            mixedPieces.push(shortp);
+	            mixedPieces.push(longp);
+	        }
+	        // Sorting makes sure if one weekday (or abbr) is a prefix of another it
+	        // will match the longer piece.
+	        minPieces.sort(cmpLenRev);
+	        shortPieces.sort(cmpLenRev);
+	        longPieces.sort(cmpLenRev);
+	        mixedPieces.sort(cmpLenRev);
+	        for (i = 0; i < 7; i++) {
+	            shortPieces[i] = regexEscape(shortPieces[i]);
+	            longPieces[i] = regexEscape(longPieces[i]);
+	            mixedPieces[i] = regexEscape(mixedPieces[i]);
+	        }
+	
+	        this._weekdaysRegex = new RegExp('^(' + mixedPieces.join('|') + ')', 'i');
+	        this._weekdaysShortRegex = this._weekdaysRegex;
+	        this._weekdaysMinRegex = this._weekdaysRegex;
+	
+	        this._weekdaysStrictRegex = new RegExp('^(' + longPieces.join('|') + ')', 'i');
+	        this._weekdaysShortStrictRegex = new RegExp('^(' + shortPieces.join('|') + ')', 'i');
+	        this._weekdaysMinStrictRegex = new RegExp('^(' + minPieces.join('|') + ')', 'i');
+	    }
+	
+	    // FORMATTING
+	
+	    function hFormat() {
+	        return this.hours() % 12 || 12;
+	    }
+	
+	    function kFormat() {
+	        return this.hours() || 24;
+	    }
+	
+	    addFormatToken('H', ['HH', 2], 0, 'hour');
+	    addFormatToken('h', ['hh', 2], 0, hFormat);
+	    addFormatToken('k', ['kk', 2], 0, kFormat);
+	
+	    addFormatToken('hmm', 0, 0, function () {
+	        return '' + hFormat.apply(this) + zeroFill(this.minutes(), 2);
+	    });
+	
+	    addFormatToken('hmmss', 0, 0, function () {
+	        return '' + hFormat.apply(this) + zeroFill(this.minutes(), 2) +
+	            zeroFill(this.seconds(), 2);
+	    });
+	
+	    addFormatToken('Hmm', 0, 0, function () {
+	        return '' + this.hours() + zeroFill(this.minutes(), 2);
+	    });
+	
+	    addFormatToken('Hmmss', 0, 0, function () {
+	        return '' + this.hours() + zeroFill(this.minutes(), 2) +
+	            zeroFill(this.seconds(), 2);
+	    });
+	
+	    function meridiem (token, lowercase) {
+	        addFormatToken(token, 0, 0, function () {
+	            return this.localeData().meridiem(this.hours(), this.minutes(), lowercase);
+	        });
+	    }
+	
+	    meridiem('a', true);
+	    meridiem('A', false);
+	
+	    // ALIASES
+	
+	    addUnitAlias('hour', 'h');
+	
+	    // PRIORITY
+	    addUnitPriority('hour', 13);
+	
+	    // PARSING
+	
+	    function matchMeridiem (isStrict, locale) {
+	        return locale._meridiemParse;
+	    }
+	
+	    addRegexToken('a',  matchMeridiem);
+	    addRegexToken('A',  matchMeridiem);
+	    addRegexToken('H',  match1to2);
+	    addRegexToken('h',  match1to2);
+	    addRegexToken('HH', match1to2, match2);
+	    addRegexToken('hh', match1to2, match2);
+	
+	    addRegexToken('hmm', match3to4);
+	    addRegexToken('hmmss', match5to6);
+	    addRegexToken('Hmm', match3to4);
+	    addRegexToken('Hmmss', match5to6);
+	
+	    addParseToken(['H', 'HH'], HOUR);
+	    addParseToken(['a', 'A'], function (input, array, config) {
+	        config._isPm = config._locale.isPM(input);
+	        config._meridiem = input;
+	    });
+	    addParseToken(['h', 'hh'], function (input, array, config) {
+	        array[HOUR] = toInt(input);
+	        getParsingFlags(config).bigHour = true;
+	    });
+	    addParseToken('hmm', function (input, array, config) {
+	        var pos = input.length - 2;
+	        array[HOUR] = toInt(input.substr(0, pos));
+	        array[MINUTE] = toInt(input.substr(pos));
+	        getParsingFlags(config).bigHour = true;
+	    });
+	    addParseToken('hmmss', function (input, array, config) {
+	        var pos1 = input.length - 4;
+	        var pos2 = input.length - 2;
+	        array[HOUR] = toInt(input.substr(0, pos1));
+	        array[MINUTE] = toInt(input.substr(pos1, 2));
+	        array[SECOND] = toInt(input.substr(pos2));
+	        getParsingFlags(config).bigHour = true;
+	    });
+	    addParseToken('Hmm', function (input, array, config) {
+	        var pos = input.length - 2;
+	        array[HOUR] = toInt(input.substr(0, pos));
+	        array[MINUTE] = toInt(input.substr(pos));
+	    });
+	    addParseToken('Hmmss', function (input, array, config) {
+	        var pos1 = input.length - 4;
+	        var pos2 = input.length - 2;
+	        array[HOUR] = toInt(input.substr(0, pos1));
+	        array[MINUTE] = toInt(input.substr(pos1, 2));
+	        array[SECOND] = toInt(input.substr(pos2));
+	    });
+	
+	    // LOCALES
+	
+	    function localeIsPM (input) {
+	        // IE8 Quirks Mode & IE7 Standards Mode do not allow accessing strings like arrays
+	        // Using charAt should be more compatible.
+	        return ((input + '').toLowerCase().charAt(0) === 'p');
+	    }
+	
+	    var defaultLocaleMeridiemParse = /[ap]\.?m?\.?/i;
+	    function localeMeridiem (hours, minutes, isLower) {
+	        if (hours > 11) {
+	            return isLower ? 'pm' : 'PM';
+	        } else {
+	            return isLower ? 'am' : 'AM';
+	        }
+	    }
+	
+	
+	    // MOMENTS
+	
+	    // Setting the hour should keep the time, because the user explicitly
+	    // specified which hour he wants. So trying to maintain the same hour (in
+	    // a new timezone) makes sense. Adding/subtracting hours does not follow
+	    // this rule.
+	    var getSetHour = makeGetSet('Hours', true);
+	
+	    var baseConfig = {
+	        calendar: defaultCalendar,
+	        longDateFormat: defaultLongDateFormat,
+	        invalidDate: defaultInvalidDate,
+	        ordinal: defaultOrdinal,
+	        ordinalParse: defaultOrdinalParse,
+	        relativeTime: defaultRelativeTime,
+	
+	        months: defaultLocaleMonths,
+	        monthsShort: defaultLocaleMonthsShort,
+	
+	        week: defaultLocaleWeek,
+	
+	        weekdays: defaultLocaleWeekdays,
+	        weekdaysMin: defaultLocaleWeekdaysMin,
+	        weekdaysShort: defaultLocaleWeekdaysShort,
+	
+	        meridiemParse: defaultLocaleMeridiemParse
+	    };
+	
+	    // internal storage for locale config files
+	    var locales = {};
+	    var globalLocale;
+	
+	    function normalizeLocale(key) {
+	        return key ? key.toLowerCase().replace('_', '-') : key;
+	    }
+	
+	    // pick the locale from the array
+	    // try ['en-au', 'en-gb'] as 'en-au', 'en-gb', 'en', as in move through the list trying each
+	    // substring from most specific to least, but move to the next array item if it's a more specific variant than the current root
+	    function chooseLocale(names) {
+	        var i = 0, j, next, locale, split;
+	
+	        while (i < names.length) {
+	            split = normalizeLocale(names[i]).split('-');
+	            j = split.length;
+	            next = normalizeLocale(names[i + 1]);
+	            next = next ? next.split('-') : null;
+	            while (j > 0) {
+	                locale = loadLocale(split.slice(0, j).join('-'));
+	                if (locale) {
+	                    return locale;
+	                }
+	                if (next && next.length >= j && compareArrays(split, next, true) >= j - 1) {
+	                    //the next array item is better than a shallower substring of this one
+	                    break;
+	                }
+	                j--;
+	            }
+	            i++;
+	        }
+	        return null;
+	    }
+	
+	    function loadLocale(name) {
+	        var oldLocale = null;
+	        // TODO: Find a better way to register and load all the locales in Node
+	        if (!locales[name] && (typeof module !== 'undefined') &&
+	                module && module.exports) {
+	            try {
+	                oldLocale = globalLocale._abbr;
+	                __webpack_require__(81)("./" + name);
+	                // because defineLocale currently also sets the global locale, we
+	                // want to undo that for lazy loaded locales
+	                locale_locales__getSetGlobalLocale(oldLocale);
+	            } catch (e) { }
+	        }
+	        return locales[name];
+	    }
+	
+	    // This function will load locale and then set the global locale.  If
+	    // no arguments are passed in, it will simply return the current global
+	    // locale key.
+	    function locale_locales__getSetGlobalLocale (key, values) {
+	        var data;
+	        if (key) {
+	            if (isUndefined(values)) {
+	                data = locale_locales__getLocale(key);
+	            }
+	            else {
+	                data = defineLocale(key, values);
+	            }
+	
+	            if (data) {
+	                // moment.duration._locale = moment._locale = data;
+	                globalLocale = data;
+	            }
+	        }
+	
+	        return globalLocale._abbr;
+	    }
+	
+	    function defineLocale (name, config) {
+	        if (config !== null) {
+	            var parentConfig = baseConfig;
+	            config.abbr = name;
+	            if (locales[name] != null) {
+	                deprecateSimple('defineLocaleOverride',
+	                        'use moment.updateLocale(localeName, config) to change ' +
+	                        'an existing locale. moment.defineLocale(localeName, ' +
+	                        'config) should only be used for creating a new locale ' +
+	                        'See http://momentjs.com/guides/#/warnings/define-locale/ for more info.');
+	                parentConfig = locales[name]._config;
+	            } else if (config.parentLocale != null) {
+	                if (locales[config.parentLocale] != null) {
+	                    parentConfig = locales[config.parentLocale]._config;
+	                } else {
+	                    // treat as if there is no base config
+	                    deprecateSimple('parentLocaleUndefined',
+	                            'specified parentLocale is not defined yet. See http://momentjs.com/guides/#/warnings/parent-locale/');
+	                }
+	            }
+	            locales[name] = new Locale(mergeConfigs(parentConfig, config));
+	
+	            // backwards compat for now: also set the locale
+	            locale_locales__getSetGlobalLocale(name);
+	
+	            return locales[name];
+	        } else {
+	            // useful for testing
+	            delete locales[name];
+	            return null;
+	        }
+	    }
+	
+	    function updateLocale(name, config) {
+	        if (config != null) {
+	            var locale, parentConfig = baseConfig;
+	            // MERGE
+	            if (locales[name] != null) {
+	                parentConfig = locales[name]._config;
+	            }
+	            config = mergeConfigs(parentConfig, config);
+	            locale = new Locale(config);
+	            locale.parentLocale = locales[name];
+	            locales[name] = locale;
+	
+	            // backwards compat for now: also set the locale
+	            locale_locales__getSetGlobalLocale(name);
+	        } else {
+	            // pass null for config to unupdate, useful for tests
+	            if (locales[name] != null) {
+	                if (locales[name].parentLocale != null) {
+	                    locales[name] = locales[name].parentLocale;
+	                } else if (locales[name] != null) {
+	                    delete locales[name];
+	                }
+	            }
+	        }
+	        return locales[name];
+	    }
+	
+	    // returns locale data
+	    function locale_locales__getLocale (key) {
+	        var locale;
+	
+	        if (key && key._locale && key._locale._abbr) {
+	            key = key._locale._abbr;
+	        }
+	
+	        if (!key) {
+	            return globalLocale;
+	        }
+	
+	        if (!isArray(key)) {
+	            //short-circuit everything else
+	            locale = loadLocale(key);
+	            if (locale) {
+	                return locale;
+	            }
+	            key = [key];
+	        }
+	
+	        return chooseLocale(key);
+	    }
+	
+	    function locale_locales__listLocales() {
+	        return keys(locales);
 	    }
 	
 	    function checkOverflow (m) {
@@ -20270,160 +21689,14 @@ var birchoutline =
 	    }
 	
 	    utils_hooks__hooks.createFromInputFallback = deprecate(
-	        'moment construction falls back to js Date. This is ' +
-	        'discouraged and will be removed in upcoming major ' +
-	        'release. Please refer to ' +
-	        'https://github.com/moment/moment/issues/1407 for more info.',
+	        'value provided is not in a recognized ISO format. moment construction falls back to js Date(), ' +
+	        'which is not reliable across all browsers and versions. Non ISO date formats are ' +
+	        'discouraged and will be removed in an upcoming major release. Please refer to ' +
+	        'http://momentjs.com/guides/#/warnings/js-date/ for more info.',
 	        function (config) {
 	            config._d = new Date(config._i + (config._useUTC ? ' UTC' : ''));
 	        }
 	    );
-	
-	    function createDate (y, m, d, h, M, s, ms) {
-	        //can't just apply() to create a date:
-	        //http://stackoverflow.com/questions/181348/instantiating-a-javascript-object-by-calling-prototype-constructor-apply
-	        var date = new Date(y, m, d, h, M, s, ms);
-	
-	        //the date constructor remaps years 0-99 to 1900-1999
-	        if (y < 100 && y >= 0 && isFinite(date.getFullYear())) {
-	            date.setFullYear(y);
-	        }
-	        return date;
-	    }
-	
-	    function createUTCDate (y) {
-	        var date = new Date(Date.UTC.apply(null, arguments));
-	
-	        //the Date.UTC function remaps years 0-99 to 1900-1999
-	        if (y < 100 && y >= 0 && isFinite(date.getUTCFullYear())) {
-	            date.setUTCFullYear(y);
-	        }
-	        return date;
-	    }
-	
-	    // FORMATTING
-	
-	    addFormatToken('Y', 0, 0, function () {
-	        var y = this.year();
-	        return y <= 9999 ? '' + y : '+' + y;
-	    });
-	
-	    addFormatToken(0, ['YY', 2], 0, function () {
-	        return this.year() % 100;
-	    });
-	
-	    addFormatToken(0, ['YYYY',   4],       0, 'year');
-	    addFormatToken(0, ['YYYYY',  5],       0, 'year');
-	    addFormatToken(0, ['YYYYYY', 6, true], 0, 'year');
-	
-	    // ALIASES
-	
-	    addUnitAlias('year', 'y');
-	
-	    // PARSING
-	
-	    addRegexToken('Y',      matchSigned);
-	    addRegexToken('YY',     match1to2, match2);
-	    addRegexToken('YYYY',   match1to4, match4);
-	    addRegexToken('YYYYY',  match1to6, match6);
-	    addRegexToken('YYYYYY', match1to6, match6);
-	
-	    addParseToken(['YYYYY', 'YYYYYY'], YEAR);
-	    addParseToken('YYYY', function (input, array) {
-	        array[YEAR] = input.length === 2 ? utils_hooks__hooks.parseTwoDigitYear(input) : toInt(input);
-	    });
-	    addParseToken('YY', function (input, array) {
-	        array[YEAR] = utils_hooks__hooks.parseTwoDigitYear(input);
-	    });
-	    addParseToken('Y', function (input, array) {
-	        array[YEAR] = parseInt(input, 10);
-	    });
-	
-	    // HELPERS
-	
-	    function daysInYear(year) {
-	        return isLeapYear(year) ? 366 : 365;
-	    }
-	
-	    function isLeapYear(year) {
-	        return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
-	    }
-	
-	    // HOOKS
-	
-	    utils_hooks__hooks.parseTwoDigitYear = function (input) {
-	        return toInt(input) + (toInt(input) > 68 ? 1900 : 2000);
-	    };
-	
-	    // MOMENTS
-	
-	    var getSetYear = makeGetSet('FullYear', true);
-	
-	    function getIsLeapYear () {
-	        return isLeapYear(this.year());
-	    }
-	
-	    // start-of-first-week - start-of-year
-	    function firstWeekOffset(year, dow, doy) {
-	        var // first-week day -- which january is always in the first week (4 for iso, 1 for other)
-	            fwd = 7 + dow - doy,
-	            // first-week day local weekday -- which local weekday is fwd
-	            fwdlw = (7 + createUTCDate(year, 0, fwd).getUTCDay() - dow) % 7;
-	
-	        return -fwdlw + fwd - 1;
-	    }
-	
-	    //http://en.wikipedia.org/wiki/ISO_week_date#Calculating_a_date_given_the_year.2C_week_number_and_weekday
-	    function dayOfYearFromWeeks(year, week, weekday, dow, doy) {
-	        var localWeekday = (7 + weekday - dow) % 7,
-	            weekOffset = firstWeekOffset(year, dow, doy),
-	            dayOfYear = 1 + 7 * (week - 1) + localWeekday + weekOffset,
-	            resYear, resDayOfYear;
-	
-	        if (dayOfYear <= 0) {
-	            resYear = year - 1;
-	            resDayOfYear = daysInYear(resYear) + dayOfYear;
-	        } else if (dayOfYear > daysInYear(year)) {
-	            resYear = year + 1;
-	            resDayOfYear = dayOfYear - daysInYear(year);
-	        } else {
-	            resYear = year;
-	            resDayOfYear = dayOfYear;
-	        }
-	
-	        return {
-	            year: resYear,
-	            dayOfYear: resDayOfYear
-	        };
-	    }
-	
-	    function weekOfYear(mom, dow, doy) {
-	        var weekOffset = firstWeekOffset(mom.year(), dow, doy),
-	            week = Math.floor((mom.dayOfYear() - weekOffset - 1) / 7) + 1,
-	            resWeek, resYear;
-	
-	        if (week < 1) {
-	            resYear = mom.year() - 1;
-	            resWeek = week + weeksInYear(resYear, dow, doy);
-	        } else if (week > weeksInYear(mom.year(), dow, doy)) {
-	            resWeek = week - weeksInYear(mom.year(), dow, doy);
-	            resYear = mom.year() + 1;
-	        } else {
-	            resYear = mom.year();
-	            resWeek = week;
-	        }
-	
-	        return {
-	            week: resWeek,
-	            year: resYear
-	        };
-	    }
-	
-	    function weeksInYear(year, dow, doy) {
-	        var weekOffset = firstWeekOffset(year, dow, doy),
-	            weekOffsetNext = firstWeekOffset(year + 1, dow, doy);
-	        return (daysInYear(year) - weekOffset + weekOffsetNext) / 7;
-	    }
 	
 	    // Pick the first defined of two or three arguments.
 	    function defaults(a, b, c) {
@@ -20621,9 +21894,9 @@ var birchoutline =
 	        }
 	
 	        // clear _12h flag if hour is <= 12
-	        if (getParsingFlags(config).bigHour === true &&
-	                config._a[HOUR] <= 12 &&
-	                config._a[HOUR] > 0) {
+	        if (config._a[HOUR] <= 12 &&
+	            getParsingFlags(config).bigHour === true &&
+	            config._a[HOUR] > 0) {
 	            getParsingFlags(config).bigHour = undefined;
 	        }
 	
@@ -20749,11 +22022,11 @@ var birchoutline =
 	            return new Moment(checkOverflow(input));
 	        } else if (isArray(format)) {
 	            configFromStringAndArray(config);
-	        } else if (format) {
-	            configFromStringAndFormat(config);
 	        } else if (isDate(input)) {
 	            config._d = input;
-	        } else {
+	        } else if (format) {
+	            configFromStringAndFormat(config);
+	        }  else {
 	            configFromInput(config);
 	        }
 	
@@ -20794,6 +22067,11 @@ var birchoutline =
 	            strict = locale;
 	            locale = undefined;
 	        }
+	
+	        if ((isObject(input) && isObjectEmpty(input)) ||
+	                (isArray(input) && input.length === 0)) {
+	            input = undefined;
+	        }
 	        // object construction must be done this way.
 	        // https://github.com/moment/moment/issues/1423
 	        c._isAMomentObject = true;
@@ -20811,19 +22089,19 @@ var birchoutline =
 	    }
 	
 	    var prototypeMin = deprecate(
-	         'moment().min is deprecated, use moment.max instead. https://github.com/moment/moment/issues/1548',
-	         function () {
-	             var other = local__createLocal.apply(null, arguments);
-	             if (this.isValid() && other.isValid()) {
-	                 return other < this ? this : other;
-	             } else {
-	                 return valid__createInvalid();
-	             }
-	         }
-	     );
+	        'moment().min is deprecated, use moment.max instead. http://momentjs.com/guides/#/warnings/min-max/',
+	        function () {
+	            var other = local__createLocal.apply(null, arguments);
+	            if (this.isValid() && other.isValid()) {
+	                return other < this ? this : other;
+	            } else {
+	                return valid__createInvalid();
+	            }
+	        }
+	    );
 	
 	    var prototypeMax = deprecate(
-	        'moment().max is deprecated, use moment.min instead. https://github.com/moment/moment/issues/1548',
+	        'moment().max is deprecated, use moment.min instead. http://momentjs.com/guides/#/warnings/min-max/',
 	        function () {
 	            var other = local__createLocal.apply(null, arguments);
 	            if (this.isValid() && other.isValid()) {
@@ -20910,6 +22188,14 @@ var birchoutline =
 	
 	    function isDuration (obj) {
 	        return obj instanceof Duration;
+	    }
+	
+	    function absRound (number) {
+	        if (number < 0) {
+	            return Math.round(-1 * number) * -1;
+	        } else {
+	            return Math.round(number);
+	        }
 	    }
 	
 	    // FORMATTING
@@ -21062,7 +22348,13 @@ var birchoutline =
 	        if (this._tzm) {
 	            this.utcOffset(this._tzm);
 	        } else if (typeof this._i === 'string') {
-	            this.utcOffset(offsetFromString(matchOffset, this._i));
+	            var tZone = offsetFromString(matchOffset, this._i);
+	
+	            if (tZone === 0) {
+	                this.utcOffset(0, true);
+	            } else {
+	                this.utcOffset(offsetFromString(matchOffset, this._i));
+	            }
 	        }
 	        return this;
 	    }
@@ -21117,7 +22409,7 @@ var birchoutline =
 	    }
 	
 	    // ASP.NET json date format regex
-	    var aspNetRegex = /^(\-)?(?:(\d*)[. ])?(\d+)\:(\d+)(?:\:(\d+)\.?(\d{3})?\d*)?$/;
+	    var aspNetRegex = /^(\-)?(?:(\d*)[. ])?(\d+)\:(\d+)(?:\:(\d+)(\.\d*)?)?$/;
 	
 	    // from http://docs.closure-library.googlecode.com/git/closure_goog_date_date.js.source.html
 	    // somewhat more in line with 4.4.3.2 2004 spec, but allows decimal anywhere
@@ -21149,11 +22441,11 @@ var birchoutline =
 	            sign = (match[1] === '-') ? -1 : 1;
 	            duration = {
 	                y  : 0,
-	                d  : toInt(match[DATE])        * sign,
-	                h  : toInt(match[HOUR])        * sign,
-	                m  : toInt(match[MINUTE])      * sign,
-	                s  : toInt(match[SECOND])      * sign,
-	                ms : toInt(match[MILLISECOND]) * sign
+	                d  : toInt(match[DATE])                         * sign,
+	                h  : toInt(match[HOUR])                         * sign,
+	                m  : toInt(match[MINUTE])                       * sign,
+	                s  : toInt(match[SECOND])                       * sign,
+	                ms : toInt(absRound(match[MILLISECOND] * 1000)) * sign // the millisecond decimal point is included in the match
 	            };
 	        } else if (!!(match = isoRegex.exec(input))) {
 	            sign = (match[1] === '-') ? -1 : 1;
@@ -21228,21 +22520,14 @@ var birchoutline =
 	        return res;
 	    }
 	
-	    function absRound (number) {
-	        if (number < 0) {
-	            return Math.round(-1 * number) * -1;
-	        } else {
-	            return Math.round(number);
-	        }
-	    }
-	
 	    // TODO: remove 'name' arg after deprecation is removed
 	    function createAdder(direction, name) {
 	        return function (val, period) {
 	            var dur, tmp;
 	            //invert the arguments, but complain about it
 	            if (period !== null && !isNaN(+period)) {
-	                deprecateSimple(name, 'moment().' + name  + '(period, number) is deprecated. Please use moment().' + name + '(number, period).');
+	                deprecateSimple(name, 'moment().' + name  + '(period, number) is deprecated. Please use moment().' + name + '(number, period). ' +
+	                'See http://momentjs.com/guides/#/warnings/add-inverted-param/ for more info.');
 	                tmp = val; val = period; period = tmp;
 	            }
 	
@@ -21282,20 +22567,24 @@ var birchoutline =
 	    var add_subtract__add      = createAdder(1, 'add');
 	    var add_subtract__subtract = createAdder(-1, 'subtract');
 	
-	    function moment_calendar__calendar (time, formats) {
-	        // We want to compare the start of today, vs this.
-	        // Getting start-of-today depends on whether we're local/utc/offset or not.
-	        var now = time || local__createLocal(),
-	            sod = cloneWithOffset(now, this).startOf('day'),
-	            diff = this.diff(sod, 'days', true),
-	            format = diff < -6 ? 'sameElse' :
+	    function getCalendarFormat(myMoment, now) {
+	        var diff = myMoment.diff(now, 'days', true);
+	        return diff < -6 ? 'sameElse' :
 	                diff < -1 ? 'lastWeek' :
 	                diff < 0 ? 'lastDay' :
 	                diff < 1 ? 'sameDay' :
 	                diff < 2 ? 'nextDay' :
 	                diff < 7 ? 'nextWeek' : 'sameElse';
+	    }
 	
-	        var output = formats && (isFunction(formats[format]) ? formats[format]() : formats[format]);
+	    function moment_calendar__calendar (time, formats) {
+	        // We want to compare the start of today, vs this.
+	        // Getting start-of-today depends on whether we're local/utc/offset or not.
+	        var now = time || local__createLocal(),
+	            sod = cloneWithOffset(now, this).startOf('day'),
+	            format = utils_hooks__hooks.calendarFormat(this, sod) || 'sameElse';
+	
+	        var output = formats && (isFunction(formats[format]) ? formats[format].call(this, now) : formats[format]);
 	
 	        return this.format(output || this.localeData().calendar(format, this, local__createLocal(now)));
 	    }
@@ -21512,27 +22801,27 @@ var birchoutline =
 	        // the following switch intentionally omits break keywords
 	        // to utilize falling through the cases.
 	        switch (units) {
-	        case 'year':
-	            this.month(0);
-	            /* falls through */
-	        case 'quarter':
-	        case 'month':
-	            this.date(1);
-	            /* falls through */
-	        case 'week':
-	        case 'isoWeek':
-	        case 'day':
-	        case 'date':
-	            this.hours(0);
-	            /* falls through */
-	        case 'hour':
-	            this.minutes(0);
-	            /* falls through */
-	        case 'minute':
-	            this.seconds(0);
-	            /* falls through */
-	        case 'second':
-	            this.milliseconds(0);
+	            case 'year':
+	                this.month(0);
+	                /* falls through */
+	            case 'quarter':
+	            case 'month':
+	                this.date(1);
+	                /* falls through */
+	            case 'week':
+	            case 'isoWeek':
+	            case 'day':
+	            case 'date':
+	                this.hours(0);
+	                /* falls through */
+	            case 'hour':
+	                this.minutes(0);
+	                /* falls through */
+	            case 'minute':
+	                this.seconds(0);
+	                /* falls through */
+	            case 'second':
+	                this.milliseconds(0);
 	        }
 	
 	        // weeks are a special case
@@ -21574,7 +22863,7 @@ var birchoutline =
 	    }
 	
 	    function toDate () {
-	        return this._offset ? new Date(this.valueOf()) : this._d;
+	        return new Date(this.valueOf());
 	    }
 	
 	    function toArray () {
@@ -21645,6 +22934,12 @@ var birchoutline =
 	
 	    addUnitAlias('weekYear', 'gg');
 	    addUnitAlias('isoWeekYear', 'GG');
+	
+	    // PRIORITY
+	
+	    addUnitPriority('weekYear', 1);
+	    addUnitPriority('isoWeekYear', 1);
+	
 	
 	    // PARSING
 	
@@ -21721,6 +23016,10 @@ var birchoutline =
 	
 	    addUnitAlias('quarter', 'Q');
 	
+	    // PRIORITY
+	
+	    addUnitPriority('quarter', 7);
+	
 	    // PARSING
 	
 	    addRegexToken('Q', match1);
@@ -21736,65 +23035,14 @@ var birchoutline =
 	
 	    // FORMATTING
 	
-	    addFormatToken('w', ['ww', 2], 'wo', 'week');
-	    addFormatToken('W', ['WW', 2], 'Wo', 'isoWeek');
-	
-	    // ALIASES
-	
-	    addUnitAlias('week', 'w');
-	    addUnitAlias('isoWeek', 'W');
-	
-	    // PARSING
-	
-	    addRegexToken('w',  match1to2);
-	    addRegexToken('ww', match1to2, match2);
-	    addRegexToken('W',  match1to2);
-	    addRegexToken('WW', match1to2, match2);
-	
-	    addWeekParseToken(['w', 'ww', 'W', 'WW'], function (input, week, config, token) {
-	        week[token.substr(0, 1)] = toInt(input);
-	    });
-	
-	    // HELPERS
-	
-	    // LOCALES
-	
-	    function localeWeek (mom) {
-	        return weekOfYear(mom, this._week.dow, this._week.doy).week;
-	    }
-	
-	    var defaultLocaleWeek = {
-	        dow : 0, // Sunday is the first day of the week.
-	        doy : 6  // The week that contains Jan 1st is the first week of the year.
-	    };
-	
-	    function localeFirstDayOfWeek () {
-	        return this._week.dow;
-	    }
-	
-	    function localeFirstDayOfYear () {
-	        return this._week.doy;
-	    }
-	
-	    // MOMENTS
-	
-	    function getSetWeek (input) {
-	        var week = this.localeData().week(this);
-	        return input == null ? week : this.add((input - week) * 7, 'd');
-	    }
-	
-	    function getSetISOWeek (input) {
-	        var week = weekOfYear(this, 1, 4).week;
-	        return input == null ? week : this.add((input - week) * 7, 'd');
-	    }
-	
-	    // FORMATTING
-	
 	    addFormatToken('D', ['DD', 2], 'Do', 'date');
 	
 	    // ALIASES
 	
 	    addUnitAlias('date', 'D');
+	
+	    // PRIOROITY
+	    addUnitPriority('date', 9);
 	
 	    // PARSING
 	
@@ -21815,332 +23063,14 @@ var birchoutline =
 	
 	    // FORMATTING
 	
-	    addFormatToken('d', 0, 'do', 'day');
-	
-	    addFormatToken('dd', 0, 0, function (format) {
-	        return this.localeData().weekdaysMin(this, format);
-	    });
-	
-	    addFormatToken('ddd', 0, 0, function (format) {
-	        return this.localeData().weekdaysShort(this, format);
-	    });
-	
-	    addFormatToken('dddd', 0, 0, function (format) {
-	        return this.localeData().weekdays(this, format);
-	    });
-	
-	    addFormatToken('e', 0, 0, 'weekday');
-	    addFormatToken('E', 0, 0, 'isoWeekday');
-	
-	    // ALIASES
-	
-	    addUnitAlias('day', 'd');
-	    addUnitAlias('weekday', 'e');
-	    addUnitAlias('isoWeekday', 'E');
-	
-	    // PARSING
-	
-	    addRegexToken('d',    match1to2);
-	    addRegexToken('e',    match1to2);
-	    addRegexToken('E',    match1to2);
-	    addRegexToken('dd',   function (isStrict, locale) {
-	        return locale.weekdaysMinRegex(isStrict);
-	    });
-	    addRegexToken('ddd',   function (isStrict, locale) {
-	        return locale.weekdaysShortRegex(isStrict);
-	    });
-	    addRegexToken('dddd',   function (isStrict, locale) {
-	        return locale.weekdaysRegex(isStrict);
-	    });
-	
-	    addWeekParseToken(['dd', 'ddd', 'dddd'], function (input, week, config, token) {
-	        var weekday = config._locale.weekdaysParse(input, token, config._strict);
-	        // if we didn't get a weekday name, mark the date as invalid
-	        if (weekday != null) {
-	            week.d = weekday;
-	        } else {
-	            getParsingFlags(config).invalidWeekday = input;
-	        }
-	    });
-	
-	    addWeekParseToken(['d', 'e', 'E'], function (input, week, config, token) {
-	        week[token] = toInt(input);
-	    });
-	
-	    // HELPERS
-	
-	    function parseWeekday(input, locale) {
-	        if (typeof input !== 'string') {
-	            return input;
-	        }
-	
-	        if (!isNaN(input)) {
-	            return parseInt(input, 10);
-	        }
-	
-	        input = locale.weekdaysParse(input);
-	        if (typeof input === 'number') {
-	            return input;
-	        }
-	
-	        return null;
-	    }
-	
-	    // LOCALES
-	
-	    var defaultLocaleWeekdays = 'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split('_');
-	    function localeWeekdays (m, format) {
-	        return isArray(this._weekdays) ? this._weekdays[m.day()] :
-	            this._weekdays[this._weekdays.isFormat.test(format) ? 'format' : 'standalone'][m.day()];
-	    }
-	
-	    var defaultLocaleWeekdaysShort = 'Sun_Mon_Tue_Wed_Thu_Fri_Sat'.split('_');
-	    function localeWeekdaysShort (m) {
-	        return this._weekdaysShort[m.day()];
-	    }
-	
-	    var defaultLocaleWeekdaysMin = 'Su_Mo_Tu_We_Th_Fr_Sa'.split('_');
-	    function localeWeekdaysMin (m) {
-	        return this._weekdaysMin[m.day()];
-	    }
-	
-	    function day_of_week__handleStrictParse(weekdayName, format, strict) {
-	        var i, ii, mom, llc = weekdayName.toLocaleLowerCase();
-	        if (!this._weekdaysParse) {
-	            this._weekdaysParse = [];
-	            this._shortWeekdaysParse = [];
-	            this._minWeekdaysParse = [];
-	
-	            for (i = 0; i < 7; ++i) {
-	                mom = create_utc__createUTC([2000, 1]).day(i);
-	                this._minWeekdaysParse[i] = this.weekdaysMin(mom, '').toLocaleLowerCase();
-	                this._shortWeekdaysParse[i] = this.weekdaysShort(mom, '').toLocaleLowerCase();
-	                this._weekdaysParse[i] = this.weekdays(mom, '').toLocaleLowerCase();
-	            }
-	        }
-	
-	        if (strict) {
-	            if (format === 'dddd') {
-	                ii = indexOf.call(this._weekdaysParse, llc);
-	                return ii !== -1 ? ii : null;
-	            } else if (format === 'ddd') {
-	                ii = indexOf.call(this._shortWeekdaysParse, llc);
-	                return ii !== -1 ? ii : null;
-	            } else {
-	                ii = indexOf.call(this._minWeekdaysParse, llc);
-	                return ii !== -1 ? ii : null;
-	            }
-	        } else {
-	            if (format === 'dddd') {
-	                ii = indexOf.call(this._weekdaysParse, llc);
-	                if (ii !== -1) {
-	                    return ii;
-	                }
-	                ii = indexOf.call(this._shortWeekdaysParse, llc);
-	                if (ii !== -1) {
-	                    return ii;
-	                }
-	                ii = indexOf.call(this._minWeekdaysParse, llc);
-	                return ii !== -1 ? ii : null;
-	            } else if (format === 'ddd') {
-	                ii = indexOf.call(this._shortWeekdaysParse, llc);
-	                if (ii !== -1) {
-	                    return ii;
-	                }
-	                ii = indexOf.call(this._weekdaysParse, llc);
-	                if (ii !== -1) {
-	                    return ii;
-	                }
-	                ii = indexOf.call(this._minWeekdaysParse, llc);
-	                return ii !== -1 ? ii : null;
-	            } else {
-	                ii = indexOf.call(this._minWeekdaysParse, llc);
-	                if (ii !== -1) {
-	                    return ii;
-	                }
-	                ii = indexOf.call(this._weekdaysParse, llc);
-	                if (ii !== -1) {
-	                    return ii;
-	                }
-	                ii = indexOf.call(this._shortWeekdaysParse, llc);
-	                return ii !== -1 ? ii : null;
-	            }
-	        }
-	    }
-	
-	    function localeWeekdaysParse (weekdayName, format, strict) {
-	        var i, mom, regex;
-	
-	        if (this._weekdaysParseExact) {
-	            return day_of_week__handleStrictParse.call(this, weekdayName, format, strict);
-	        }
-	
-	        if (!this._weekdaysParse) {
-	            this._weekdaysParse = [];
-	            this._minWeekdaysParse = [];
-	            this._shortWeekdaysParse = [];
-	            this._fullWeekdaysParse = [];
-	        }
-	
-	        for (i = 0; i < 7; i++) {
-	            // make the regex if we don't have it already
-	
-	            mom = create_utc__createUTC([2000, 1]).day(i);
-	            if (strict && !this._fullWeekdaysParse[i]) {
-	                this._fullWeekdaysParse[i] = new RegExp('^' + this.weekdays(mom, '').replace('.', '\.?') + '$', 'i');
-	                this._shortWeekdaysParse[i] = new RegExp('^' + this.weekdaysShort(mom, '').replace('.', '\.?') + '$', 'i');
-	                this._minWeekdaysParse[i] = new RegExp('^' + this.weekdaysMin(mom, '').replace('.', '\.?') + '$', 'i');
-	            }
-	            if (!this._weekdaysParse[i]) {
-	                regex = '^' + this.weekdays(mom, '') + '|^' + this.weekdaysShort(mom, '') + '|^' + this.weekdaysMin(mom, '');
-	                this._weekdaysParse[i] = new RegExp(regex.replace('.', ''), 'i');
-	            }
-	            // test the regex
-	            if (strict && format === 'dddd' && this._fullWeekdaysParse[i].test(weekdayName)) {
-	                return i;
-	            } else if (strict && format === 'ddd' && this._shortWeekdaysParse[i].test(weekdayName)) {
-	                return i;
-	            } else if (strict && format === 'dd' && this._minWeekdaysParse[i].test(weekdayName)) {
-	                return i;
-	            } else if (!strict && this._weekdaysParse[i].test(weekdayName)) {
-	                return i;
-	            }
-	        }
-	    }
-	
-	    // MOMENTS
-	
-	    function getSetDayOfWeek (input) {
-	        if (!this.isValid()) {
-	            return input != null ? this : NaN;
-	        }
-	        var day = this._isUTC ? this._d.getUTCDay() : this._d.getDay();
-	        if (input != null) {
-	            input = parseWeekday(input, this.localeData());
-	            return this.add(input - day, 'd');
-	        } else {
-	            return day;
-	        }
-	    }
-	
-	    function getSetLocaleDayOfWeek (input) {
-	        if (!this.isValid()) {
-	            return input != null ? this : NaN;
-	        }
-	        var weekday = (this.day() + 7 - this.localeData()._week.dow) % 7;
-	        return input == null ? weekday : this.add(input - weekday, 'd');
-	    }
-	
-	    function getSetISODayOfWeek (input) {
-	        if (!this.isValid()) {
-	            return input != null ? this : NaN;
-	        }
-	        // behaves the same as moment#day except
-	        // as a getter, returns 7 instead of 0 (1-7 range instead of 0-6)
-	        // as a setter, sunday should belong to the previous week.
-	        return input == null ? this.day() || 7 : this.day(this.day() % 7 ? input : input - 7);
-	    }
-	
-	    var defaultWeekdaysRegex = matchWord;
-	    function weekdaysRegex (isStrict) {
-	        if (this._weekdaysParseExact) {
-	            if (!hasOwnProp(this, '_weekdaysRegex')) {
-	                computeWeekdaysParse.call(this);
-	            }
-	            if (isStrict) {
-	                return this._weekdaysStrictRegex;
-	            } else {
-	                return this._weekdaysRegex;
-	            }
-	        } else {
-	            return this._weekdaysStrictRegex && isStrict ?
-	                this._weekdaysStrictRegex : this._weekdaysRegex;
-	        }
-	    }
-	
-	    var defaultWeekdaysShortRegex = matchWord;
-	    function weekdaysShortRegex (isStrict) {
-	        if (this._weekdaysParseExact) {
-	            if (!hasOwnProp(this, '_weekdaysRegex')) {
-	                computeWeekdaysParse.call(this);
-	            }
-	            if (isStrict) {
-	                return this._weekdaysShortStrictRegex;
-	            } else {
-	                return this._weekdaysShortRegex;
-	            }
-	        } else {
-	            return this._weekdaysShortStrictRegex && isStrict ?
-	                this._weekdaysShortStrictRegex : this._weekdaysShortRegex;
-	        }
-	    }
-	
-	    var defaultWeekdaysMinRegex = matchWord;
-	    function weekdaysMinRegex (isStrict) {
-	        if (this._weekdaysParseExact) {
-	            if (!hasOwnProp(this, '_weekdaysRegex')) {
-	                computeWeekdaysParse.call(this);
-	            }
-	            if (isStrict) {
-	                return this._weekdaysMinStrictRegex;
-	            } else {
-	                return this._weekdaysMinRegex;
-	            }
-	        } else {
-	            return this._weekdaysMinStrictRegex && isStrict ?
-	                this._weekdaysMinStrictRegex : this._weekdaysMinRegex;
-	        }
-	    }
-	
-	
-	    function computeWeekdaysParse () {
-	        function cmpLenRev(a, b) {
-	            return b.length - a.length;
-	        }
-	
-	        var minPieces = [], shortPieces = [], longPieces = [], mixedPieces = [],
-	            i, mom, minp, shortp, longp;
-	        for (i = 0; i < 7; i++) {
-	            // make the regex if we don't have it already
-	            mom = create_utc__createUTC([2000, 1]).day(i);
-	            minp = this.weekdaysMin(mom, '');
-	            shortp = this.weekdaysShort(mom, '');
-	            longp = this.weekdays(mom, '');
-	            minPieces.push(minp);
-	            shortPieces.push(shortp);
-	            longPieces.push(longp);
-	            mixedPieces.push(minp);
-	            mixedPieces.push(shortp);
-	            mixedPieces.push(longp);
-	        }
-	        // Sorting makes sure if one weekday (or abbr) is a prefix of another it
-	        // will match the longer piece.
-	        minPieces.sort(cmpLenRev);
-	        shortPieces.sort(cmpLenRev);
-	        longPieces.sort(cmpLenRev);
-	        mixedPieces.sort(cmpLenRev);
-	        for (i = 0; i < 7; i++) {
-	            shortPieces[i] = regexEscape(shortPieces[i]);
-	            longPieces[i] = regexEscape(longPieces[i]);
-	            mixedPieces[i] = regexEscape(mixedPieces[i]);
-	        }
-	
-	        this._weekdaysRegex = new RegExp('^(' + mixedPieces.join('|') + ')', 'i');
-	        this._weekdaysShortRegex = this._weekdaysRegex;
-	        this._weekdaysMinRegex = this._weekdaysRegex;
-	
-	        this._weekdaysStrictRegex = new RegExp('^(' + longPieces.join('|') + ')', 'i');
-	        this._weekdaysShortStrictRegex = new RegExp('^(' + shortPieces.join('|') + ')', 'i');
-	        this._weekdaysMinStrictRegex = new RegExp('^(' + minPieces.join('|') + ')', 'i');
-	    }
-	
-	    // FORMATTING
-	
 	    addFormatToken('DDD', ['DDDD', 3], 'DDDo', 'dayOfYear');
 	
 	    // ALIASES
 	
 	    addUnitAlias('dayOfYear', 'DDD');
+	
+	    // PRIORITY
+	    addUnitPriority('dayOfYear', 4);
 	
 	    // PARSING
 	
@@ -22161,136 +23091,15 @@ var birchoutline =
 	
 	    // FORMATTING
 	
-	    function hFormat() {
-	        return this.hours() % 12 || 12;
-	    }
-	
-	    function kFormat() {
-	        return this.hours() || 24;
-	    }
-	
-	    addFormatToken('H', ['HH', 2], 0, 'hour');
-	    addFormatToken('h', ['hh', 2], 0, hFormat);
-	    addFormatToken('k', ['kk', 2], 0, kFormat);
-	
-	    addFormatToken('hmm', 0, 0, function () {
-	        return '' + hFormat.apply(this) + zeroFill(this.minutes(), 2);
-	    });
-	
-	    addFormatToken('hmmss', 0, 0, function () {
-	        return '' + hFormat.apply(this) + zeroFill(this.minutes(), 2) +
-	            zeroFill(this.seconds(), 2);
-	    });
-	
-	    addFormatToken('Hmm', 0, 0, function () {
-	        return '' + this.hours() + zeroFill(this.minutes(), 2);
-	    });
-	
-	    addFormatToken('Hmmss', 0, 0, function () {
-	        return '' + this.hours() + zeroFill(this.minutes(), 2) +
-	            zeroFill(this.seconds(), 2);
-	    });
-	
-	    function meridiem (token, lowercase) {
-	        addFormatToken(token, 0, 0, function () {
-	            return this.localeData().meridiem(this.hours(), this.minutes(), lowercase);
-	        });
-	    }
-	
-	    meridiem('a', true);
-	    meridiem('A', false);
-	
-	    // ALIASES
-	
-	    addUnitAlias('hour', 'h');
-	
-	    // PARSING
-	
-	    function matchMeridiem (isStrict, locale) {
-	        return locale._meridiemParse;
-	    }
-	
-	    addRegexToken('a',  matchMeridiem);
-	    addRegexToken('A',  matchMeridiem);
-	    addRegexToken('H',  match1to2);
-	    addRegexToken('h',  match1to2);
-	    addRegexToken('HH', match1to2, match2);
-	    addRegexToken('hh', match1to2, match2);
-	
-	    addRegexToken('hmm', match3to4);
-	    addRegexToken('hmmss', match5to6);
-	    addRegexToken('Hmm', match3to4);
-	    addRegexToken('Hmmss', match5to6);
-	
-	    addParseToken(['H', 'HH'], HOUR);
-	    addParseToken(['a', 'A'], function (input, array, config) {
-	        config._isPm = config._locale.isPM(input);
-	        config._meridiem = input;
-	    });
-	    addParseToken(['h', 'hh'], function (input, array, config) {
-	        array[HOUR] = toInt(input);
-	        getParsingFlags(config).bigHour = true;
-	    });
-	    addParseToken('hmm', function (input, array, config) {
-	        var pos = input.length - 2;
-	        array[HOUR] = toInt(input.substr(0, pos));
-	        array[MINUTE] = toInt(input.substr(pos));
-	        getParsingFlags(config).bigHour = true;
-	    });
-	    addParseToken('hmmss', function (input, array, config) {
-	        var pos1 = input.length - 4;
-	        var pos2 = input.length - 2;
-	        array[HOUR] = toInt(input.substr(0, pos1));
-	        array[MINUTE] = toInt(input.substr(pos1, 2));
-	        array[SECOND] = toInt(input.substr(pos2));
-	        getParsingFlags(config).bigHour = true;
-	    });
-	    addParseToken('Hmm', function (input, array, config) {
-	        var pos = input.length - 2;
-	        array[HOUR] = toInt(input.substr(0, pos));
-	        array[MINUTE] = toInt(input.substr(pos));
-	    });
-	    addParseToken('Hmmss', function (input, array, config) {
-	        var pos1 = input.length - 4;
-	        var pos2 = input.length - 2;
-	        array[HOUR] = toInt(input.substr(0, pos1));
-	        array[MINUTE] = toInt(input.substr(pos1, 2));
-	        array[SECOND] = toInt(input.substr(pos2));
-	    });
-	
-	    // LOCALES
-	
-	    function localeIsPM (input) {
-	        // IE8 Quirks Mode & IE7 Standards Mode do not allow accessing strings like arrays
-	        // Using charAt should be more compatible.
-	        return ((input + '').toLowerCase().charAt(0) === 'p');
-	    }
-	
-	    var defaultLocaleMeridiemParse = /[ap]\.?m?\.?/i;
-	    function localeMeridiem (hours, minutes, isLower) {
-	        if (hours > 11) {
-	            return isLower ? 'pm' : 'PM';
-	        } else {
-	            return isLower ? 'am' : 'AM';
-	        }
-	    }
-	
-	
-	    // MOMENTS
-	
-	    // Setting the hour should keep the time, because the user explicitly
-	    // specified which hour he wants. So trying to maintain the same hour (in
-	    // a new timezone) makes sense. Adding/subtracting hours does not follow
-	    // this rule.
-	    var getSetHour = makeGetSet('Hours', true);
-	
-	    // FORMATTING
-	
 	    addFormatToken('m', ['mm', 2], 0, 'minute');
 	
 	    // ALIASES
 	
 	    addUnitAlias('minute', 'm');
+	
+	    // PRIORITY
+	
+	    addUnitPriority('minute', 14);
 	
 	    // PARSING
 	
@@ -22309,6 +23118,10 @@ var birchoutline =
 	    // ALIASES
 	
 	    addUnitAlias('second', 's');
+	
+	    // PRIORITY
+	
+	    addUnitPriority('second', 15);
 	
 	    // PARSING
 	
@@ -22354,6 +23167,10 @@ var birchoutline =
 	    // ALIASES
 	
 	    addUnitAlias('millisecond', 'ms');
+	
+	    // PRIORITY
+	
+	    addUnitPriority('millisecond', 16);
 	
 	    // PARSING
 	
@@ -22404,7 +23221,7 @@ var birchoutline =
 	    momentPrototype__proto.fromNow           = fromNow;
 	    momentPrototype__proto.to                = to;
 	    momentPrototype__proto.toNow             = toNow;
-	    momentPrototype__proto.get               = getSet;
+	    momentPrototype__proto.get               = stringGet;
 	    momentPrototype__proto.invalidAt         = invalidAt;
 	    momentPrototype__proto.isAfter           = isAfter;
 	    momentPrototype__proto.isBefore          = isBefore;
@@ -22419,7 +23236,7 @@ var birchoutline =
 	    momentPrototype__proto.max               = prototypeMax;
 	    momentPrototype__proto.min               = prototypeMin;
 	    momentPrototype__proto.parsingFlags      = parsingFlags;
-	    momentPrototype__proto.set               = getSet;
+	    momentPrototype__proto.set               = stringSet;
 	    momentPrototype__proto.startOf           = startOf;
 	    momentPrototype__proto.subtract          = add_subtract__subtract;
 	    momentPrototype__proto.toArray           = toArray;
@@ -22479,7 +23296,6 @@ var birchoutline =
 	    momentPrototype__proto.parseZone            = setOffsetToParsedOffset;
 	    momentPrototype__proto.hasAlignedHourOffset = hasAlignedHourOffset;
 	    momentPrototype__proto.isDST                = isDaylightSavingTime;
-	    momentPrototype__proto.isDSTShifted         = isDaylightSavingTimeShifted;
 	    momentPrototype__proto.isLocal              = isLocal;
 	    momentPrototype__proto.isUtcOffset          = isUtcOffset;
 	    momentPrototype__proto.isUtc                = isUtc;
@@ -22493,7 +23309,8 @@ var birchoutline =
 	    momentPrototype__proto.dates  = deprecate('dates accessor is deprecated. Use date instead.', getSetDayOfMonth);
 	    momentPrototype__proto.months = deprecate('months accessor is deprecated. Use month instead', getSetMonth);
 	    momentPrototype__proto.years  = deprecate('years accessor is deprecated. Use year instead', getSetYear);
-	    momentPrototype__proto.zone   = deprecate('moment().zone is deprecated, use moment().utcOffset instead. https://github.com/moment/moment/issues/1779', getSetZone);
+	    momentPrototype__proto.zone   = deprecate('moment().zone is deprecated, use moment().utcOffset instead. http://momentjs.com/guides/#/warnings/zone/', getSetZone);
+	    momentPrototype__proto.isDSTShifted = deprecate('isDSTShifted is deprecated. See http://momentjs.com/guides/#/warnings/dst-shifted/ for more information', isDaylightSavingTimeShifted);
 	
 	    var momentPrototype = momentPrototype__proto;
 	
@@ -22505,143 +23322,46 @@ var birchoutline =
 	        return local__createLocal.apply(null, arguments).parseZone();
 	    }
 	
-	    var defaultCalendar = {
-	        sameDay : '[Today at] LT',
-	        nextDay : '[Tomorrow at] LT',
-	        nextWeek : 'dddd [at] LT',
-	        lastDay : '[Yesterday at] LT',
-	        lastWeek : '[Last] dddd [at] LT',
-	        sameElse : 'L'
-	    };
-	
-	    function locale_calendar__calendar (key, mom, now) {
-	        var output = this._calendar[key];
-	        return isFunction(output) ? output.call(mom, now) : output;
-	    }
-	
-	    var defaultLongDateFormat = {
-	        LTS  : 'h:mm:ss A',
-	        LT   : 'h:mm A',
-	        L    : 'MM/DD/YYYY',
-	        LL   : 'MMMM D, YYYY',
-	        LLL  : 'MMMM D, YYYY h:mm A',
-	        LLLL : 'dddd, MMMM D, YYYY h:mm A'
-	    };
-	
-	    function longDateFormat (key) {
-	        var format = this._longDateFormat[key],
-	            formatUpper = this._longDateFormat[key.toUpperCase()];
-	
-	        if (format || !formatUpper) {
-	            return format;
-	        }
-	
-	        this._longDateFormat[key] = formatUpper.replace(/MMMM|MM|DD|dddd/g, function (val) {
-	            return val.slice(1);
-	        });
-	
-	        return this._longDateFormat[key];
-	    }
-	
-	    var defaultInvalidDate = 'Invalid date';
-	
-	    function invalidDate () {
-	        return this._invalidDate;
-	    }
-	
-	    var defaultOrdinal = '%d';
-	    var defaultOrdinalParse = /\d{1,2}/;
-	
-	    function ordinal (number) {
-	        return this._ordinal.replace('%d', number);
-	    }
-	
 	    function preParsePostFormat (string) {
 	        return string;
 	    }
 	
-	    var defaultRelativeTime = {
-	        future : 'in %s',
-	        past   : '%s ago',
-	        s  : 'a few seconds',
-	        m  : 'a minute',
-	        mm : '%d minutes',
-	        h  : 'an hour',
-	        hh : '%d hours',
-	        d  : 'a day',
-	        dd : '%d days',
-	        M  : 'a month',
-	        MM : '%d months',
-	        y  : 'a year',
-	        yy : '%d years'
-	    };
-	
-	    function relative__relativeTime (number, withoutSuffix, string, isFuture) {
-	        var output = this._relativeTime[string];
-	        return (isFunction(output)) ?
-	            output(number, withoutSuffix, string, isFuture) :
-	            output.replace(/%d/i, number);
-	    }
-	
-	    function pastFuture (diff, output) {
-	        var format = this._relativeTime[diff > 0 ? 'future' : 'past'];
-	        return isFunction(format) ? format(output) : format.replace(/%s/i, output);
-	    }
-	
 	    var prototype__proto = Locale.prototype;
 	
-	    prototype__proto._calendar       = defaultCalendar;
 	    prototype__proto.calendar        = locale_calendar__calendar;
-	    prototype__proto._longDateFormat = defaultLongDateFormat;
 	    prototype__proto.longDateFormat  = longDateFormat;
-	    prototype__proto._invalidDate    = defaultInvalidDate;
 	    prototype__proto.invalidDate     = invalidDate;
-	    prototype__proto._ordinal        = defaultOrdinal;
 	    prototype__proto.ordinal         = ordinal;
-	    prototype__proto._ordinalParse   = defaultOrdinalParse;
 	    prototype__proto.preparse        = preParsePostFormat;
 	    prototype__proto.postformat      = preParsePostFormat;
-	    prototype__proto._relativeTime   = defaultRelativeTime;
 	    prototype__proto.relativeTime    = relative__relativeTime;
 	    prototype__proto.pastFuture      = pastFuture;
 	    prototype__proto.set             = locale_set__set;
 	
 	    // Month
 	    prototype__proto.months            =        localeMonths;
-	    prototype__proto._months           = defaultLocaleMonths;
 	    prototype__proto.monthsShort       =        localeMonthsShort;
-	    prototype__proto._monthsShort      = defaultLocaleMonthsShort;
 	    prototype__proto.monthsParse       =        localeMonthsParse;
-	    prototype__proto._monthsRegex      = defaultMonthsRegex;
 	    prototype__proto.monthsRegex       = monthsRegex;
-	    prototype__proto._monthsShortRegex = defaultMonthsShortRegex;
 	    prototype__proto.monthsShortRegex  = monthsShortRegex;
 	
 	    // Week
 	    prototype__proto.week = localeWeek;
-	    prototype__proto._week = defaultLocaleWeek;
 	    prototype__proto.firstDayOfYear = localeFirstDayOfYear;
 	    prototype__proto.firstDayOfWeek = localeFirstDayOfWeek;
 	
 	    // Day of Week
 	    prototype__proto.weekdays       =        localeWeekdays;
-	    prototype__proto._weekdays      = defaultLocaleWeekdays;
 	    prototype__proto.weekdaysMin    =        localeWeekdaysMin;
-	    prototype__proto._weekdaysMin   = defaultLocaleWeekdaysMin;
 	    prototype__proto.weekdaysShort  =        localeWeekdaysShort;
-	    prototype__proto._weekdaysShort = defaultLocaleWeekdaysShort;
 	    prototype__proto.weekdaysParse  =        localeWeekdaysParse;
 	
-	    prototype__proto._weekdaysRegex      = defaultWeekdaysRegex;
 	    prototype__proto.weekdaysRegex       =        weekdaysRegex;
-	    prototype__proto._weekdaysShortRegex = defaultWeekdaysShortRegex;
 	    prototype__proto.weekdaysShortRegex  =        weekdaysShortRegex;
-	    prototype__proto._weekdaysMinRegex   = defaultWeekdaysMinRegex;
 	    prototype__proto.weekdaysMinRegex    =        weekdaysMinRegex;
 	
 	    // Hours
 	    prototype__proto.isPM = localeIsPM;
-	    prototype__proto._meridiemParse = defaultLocaleMeridiemParse;
 	    prototype__proto.meridiem = localeMeridiem;
 	
 	    function lists__get (format, index, field, setter) {
@@ -22970,6 +23690,18 @@ var birchoutline =
 	        return substituteTimeAgo.apply(null, a);
 	    }
 	
+	    // This function allows you to set the rounding function for relative time strings
+	    function duration_humanize__getSetRelativeTimeRounding (roundingFunction) {
+	        if (roundingFunction === undefined) {
+	            return round;
+	        }
+	        if (typeof(roundingFunction) === 'function') {
+	            round = roundingFunction;
+	            return true;
+	        }
+	        return false;
+	    }
+	
 	    // This function allows you to set a threshold for relative time strings
 	    function duration_humanize__getSetRelativeTimeThreshold (threshold, limit) {
 	        if (thresholds[threshold] === undefined) {
@@ -23102,7 +23834,7 @@ var birchoutline =
 	    // Side effect imports
 	
 	
-	    utils_hooks__hooks.version = '2.13.0';
+	    utils_hooks__hooks.version = '2.15.2';
 	
 	    setHookCallback(local__createLocal);
 	
@@ -23129,7 +23861,9 @@ var birchoutline =
 	    utils_hooks__hooks.locales               = locale_locales__listLocales;
 	    utils_hooks__hooks.weekdaysShort         = lists__listWeekdaysShort;
 	    utils_hooks__hooks.normalizeUnits        = normalizeUnits;
+	    utils_hooks__hooks.relativeTimeRounding = duration_humanize__getSetRelativeTimeRounding;
 	    utils_hooks__hooks.relativeTimeThreshold = duration_humanize__getSetRelativeTimeThreshold;
+	    utils_hooks__hooks.calendarFormat        = getCalendarFormat;
 	    utils_hooks__hooks.prototype             = momentPrototype;
 	
 	    var _moment = utils_hooks__hooks;
@@ -23137,10 +23871,10 @@ var birchoutline =
 	    return _moment;
 	
 	}));
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(79)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(80)(module)))
 
 /***/ },
-/* 79 */
+/* 80 */
 /***/ function(module, exports) {
 
 	module.exports = function(module) {
@@ -23156,210 +23890,218 @@ var birchoutline =
 
 
 /***/ },
-/* 80 */
+/* 81 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var map = {
-		"./af": 81,
-		"./af.js": 81,
-		"./ar": 82,
-		"./ar-ma": 83,
-		"./ar-ma.js": 83,
-		"./ar-sa": 84,
-		"./ar-sa.js": 84,
-		"./ar-tn": 85,
-		"./ar-tn.js": 85,
-		"./ar.js": 82,
-		"./az": 86,
-		"./az.js": 86,
-		"./be": 87,
-		"./be.js": 87,
-		"./bg": 88,
-		"./bg.js": 88,
-		"./bn": 89,
-		"./bn.js": 89,
-		"./bo": 90,
-		"./bo.js": 90,
-		"./br": 91,
-		"./br.js": 91,
-		"./bs": 92,
-		"./bs.js": 92,
-		"./ca": 93,
-		"./ca.js": 93,
-		"./cs": 94,
-		"./cs.js": 94,
-		"./cv": 95,
-		"./cv.js": 95,
-		"./cy": 96,
-		"./cy.js": 96,
-		"./da": 97,
-		"./da.js": 97,
-		"./de": 98,
-		"./de-at": 99,
-		"./de-at.js": 99,
-		"./de.js": 98,
-		"./dv": 100,
-		"./dv.js": 100,
-		"./el": 101,
-		"./el.js": 101,
-		"./en-au": 102,
-		"./en-au.js": 102,
-		"./en-ca": 103,
-		"./en-ca.js": 103,
-		"./en-gb": 104,
-		"./en-gb.js": 104,
-		"./en-ie": 105,
-		"./en-ie.js": 105,
-		"./en-nz": 106,
-		"./en-nz.js": 106,
-		"./eo": 107,
-		"./eo.js": 107,
-		"./es": 108,
-		"./es.js": 108,
-		"./et": 109,
-		"./et.js": 109,
-		"./eu": 110,
-		"./eu.js": 110,
-		"./fa": 111,
-		"./fa.js": 111,
-		"./fi": 112,
-		"./fi.js": 112,
-		"./fo": 113,
-		"./fo.js": 113,
-		"./fr": 114,
-		"./fr-ca": 115,
-		"./fr-ca.js": 115,
-		"./fr-ch": 116,
-		"./fr-ch.js": 116,
-		"./fr.js": 114,
-		"./fy": 117,
-		"./fy.js": 117,
-		"./gd": 118,
-		"./gd.js": 118,
-		"./gl": 119,
-		"./gl.js": 119,
-		"./he": 120,
-		"./he.js": 120,
-		"./hi": 121,
-		"./hi.js": 121,
-		"./hr": 122,
-		"./hr.js": 122,
-		"./hu": 123,
-		"./hu.js": 123,
-		"./hy-am": 124,
-		"./hy-am.js": 124,
-		"./id": 125,
-		"./id.js": 125,
-		"./is": 126,
-		"./is.js": 126,
-		"./it": 127,
-		"./it.js": 127,
-		"./ja": 128,
-		"./ja.js": 128,
-		"./jv": 129,
-		"./jv.js": 129,
-		"./ka": 130,
-		"./ka.js": 130,
-		"./kk": 131,
-		"./kk.js": 131,
-		"./km": 132,
-		"./km.js": 132,
-		"./ko": 133,
-		"./ko.js": 133,
-		"./ky": 134,
-		"./ky.js": 134,
-		"./lb": 135,
-		"./lb.js": 135,
-		"./lo": 136,
-		"./lo.js": 136,
-		"./lt": 137,
-		"./lt.js": 137,
-		"./lv": 138,
-		"./lv.js": 138,
-		"./me": 139,
-		"./me.js": 139,
-		"./mk": 140,
-		"./mk.js": 140,
-		"./ml": 141,
-		"./ml.js": 141,
-		"./mr": 142,
-		"./mr.js": 142,
-		"./ms": 143,
-		"./ms-my": 144,
-		"./ms-my.js": 144,
-		"./ms.js": 143,
-		"./my": 145,
-		"./my.js": 145,
-		"./nb": 146,
-		"./nb.js": 146,
-		"./ne": 147,
-		"./ne.js": 147,
-		"./nl": 148,
-		"./nl.js": 148,
-		"./nn": 149,
-		"./nn.js": 149,
-		"./pa-in": 150,
-		"./pa-in.js": 150,
-		"./pl": 151,
-		"./pl.js": 151,
-		"./pt": 152,
-		"./pt-br": 153,
-		"./pt-br.js": 153,
-		"./pt.js": 152,
-		"./ro": 154,
-		"./ro.js": 154,
-		"./ru": 155,
-		"./ru.js": 155,
-		"./se": 156,
-		"./se.js": 156,
-		"./si": 157,
-		"./si.js": 157,
-		"./sk": 158,
-		"./sk.js": 158,
-		"./sl": 159,
-		"./sl.js": 159,
-		"./sq": 160,
-		"./sq.js": 160,
-		"./sr": 161,
-		"./sr-cyrl": 162,
-		"./sr-cyrl.js": 162,
-		"./sr.js": 161,
-		"./ss": 163,
-		"./ss.js": 163,
-		"./sv": 164,
-		"./sv.js": 164,
-		"./sw": 165,
-		"./sw.js": 165,
-		"./ta": 166,
-		"./ta.js": 166,
-		"./te": 167,
-		"./te.js": 167,
-		"./th": 168,
-		"./th.js": 168,
-		"./tl-ph": 169,
-		"./tl-ph.js": 169,
-		"./tlh": 170,
-		"./tlh.js": 170,
-		"./tr": 171,
-		"./tr.js": 171,
-		"./tzl": 172,
-		"./tzl.js": 172,
-		"./tzm": 173,
-		"./tzm-latn": 174,
-		"./tzm-latn.js": 174,
-		"./tzm.js": 173,
-		"./uk": 175,
-		"./uk.js": 175,
-		"./uz": 176,
-		"./uz.js": 176,
-		"./vi": 177,
-		"./vi.js": 177,
-		"./x-pseudo": 178,
-		"./x-pseudo.js": 178,
-		"./zh-cn": 179,
-		"./zh-cn.js": 179,
-		"./zh-tw": 180,
-		"./zh-tw.js": 180
+		"./af": 82,
+		"./af.js": 82,
+		"./ar": 83,
+		"./ar-ly": 84,
+		"./ar-ly.js": 84,
+		"./ar-ma": 85,
+		"./ar-ma.js": 85,
+		"./ar-sa": 86,
+		"./ar-sa.js": 86,
+		"./ar-tn": 87,
+		"./ar-tn.js": 87,
+		"./ar.js": 83,
+		"./az": 88,
+		"./az.js": 88,
+		"./be": 89,
+		"./be.js": 89,
+		"./bg": 90,
+		"./bg.js": 90,
+		"./bn": 91,
+		"./bn.js": 91,
+		"./bo": 92,
+		"./bo.js": 92,
+		"./br": 93,
+		"./br.js": 93,
+		"./bs": 94,
+		"./bs.js": 94,
+		"./ca": 95,
+		"./ca.js": 95,
+		"./cs": 96,
+		"./cs.js": 96,
+		"./cv": 97,
+		"./cv.js": 97,
+		"./cy": 98,
+		"./cy.js": 98,
+		"./da": 99,
+		"./da.js": 99,
+		"./de": 100,
+		"./de-at": 101,
+		"./de-at.js": 101,
+		"./de.js": 100,
+		"./dv": 102,
+		"./dv.js": 102,
+		"./el": 103,
+		"./el.js": 103,
+		"./en-au": 104,
+		"./en-au.js": 104,
+		"./en-ca": 105,
+		"./en-ca.js": 105,
+		"./en-gb": 106,
+		"./en-gb.js": 106,
+		"./en-ie": 107,
+		"./en-ie.js": 107,
+		"./en-nz": 108,
+		"./en-nz.js": 108,
+		"./eo": 109,
+		"./eo.js": 109,
+		"./es": 110,
+		"./es-do": 111,
+		"./es-do.js": 111,
+		"./es.js": 110,
+		"./et": 112,
+		"./et.js": 112,
+		"./eu": 113,
+		"./eu.js": 113,
+		"./fa": 114,
+		"./fa.js": 114,
+		"./fi": 115,
+		"./fi.js": 115,
+		"./fo": 116,
+		"./fo.js": 116,
+		"./fr": 117,
+		"./fr-ca": 118,
+		"./fr-ca.js": 118,
+		"./fr-ch": 119,
+		"./fr-ch.js": 119,
+		"./fr.js": 117,
+		"./fy": 120,
+		"./fy.js": 120,
+		"./gd": 121,
+		"./gd.js": 121,
+		"./gl": 122,
+		"./gl.js": 122,
+		"./he": 123,
+		"./he.js": 123,
+		"./hi": 124,
+		"./hi.js": 124,
+		"./hr": 125,
+		"./hr.js": 125,
+		"./hu": 126,
+		"./hu.js": 126,
+		"./hy-am": 127,
+		"./hy-am.js": 127,
+		"./id": 128,
+		"./id.js": 128,
+		"./is": 129,
+		"./is.js": 129,
+		"./it": 130,
+		"./it.js": 130,
+		"./ja": 131,
+		"./ja.js": 131,
+		"./jv": 132,
+		"./jv.js": 132,
+		"./ka": 133,
+		"./ka.js": 133,
+		"./kk": 134,
+		"./kk.js": 134,
+		"./km": 135,
+		"./km.js": 135,
+		"./ko": 136,
+		"./ko.js": 136,
+		"./ky": 137,
+		"./ky.js": 137,
+		"./lb": 138,
+		"./lb.js": 138,
+		"./lo": 139,
+		"./lo.js": 139,
+		"./lt": 140,
+		"./lt.js": 140,
+		"./lv": 141,
+		"./lv.js": 141,
+		"./me": 142,
+		"./me.js": 142,
+		"./mi": 143,
+		"./mi.js": 143,
+		"./mk": 144,
+		"./mk.js": 144,
+		"./ml": 145,
+		"./ml.js": 145,
+		"./mr": 146,
+		"./mr.js": 146,
+		"./ms": 147,
+		"./ms-my": 148,
+		"./ms-my.js": 148,
+		"./ms.js": 147,
+		"./my": 149,
+		"./my.js": 149,
+		"./nb": 150,
+		"./nb.js": 150,
+		"./ne": 151,
+		"./ne.js": 151,
+		"./nl": 152,
+		"./nl.js": 152,
+		"./nn": 153,
+		"./nn.js": 153,
+		"./pa-in": 154,
+		"./pa-in.js": 154,
+		"./pl": 155,
+		"./pl.js": 155,
+		"./pt": 156,
+		"./pt-br": 157,
+		"./pt-br.js": 157,
+		"./pt.js": 156,
+		"./ro": 158,
+		"./ro.js": 158,
+		"./ru": 159,
+		"./ru.js": 159,
+		"./se": 160,
+		"./se.js": 160,
+		"./si": 161,
+		"./si.js": 161,
+		"./sk": 162,
+		"./sk.js": 162,
+		"./sl": 163,
+		"./sl.js": 163,
+		"./sq": 164,
+		"./sq.js": 164,
+		"./sr": 165,
+		"./sr-cyrl": 166,
+		"./sr-cyrl.js": 166,
+		"./sr.js": 165,
+		"./ss": 167,
+		"./ss.js": 167,
+		"./sv": 168,
+		"./sv.js": 168,
+		"./sw": 169,
+		"./sw.js": 169,
+		"./ta": 170,
+		"./ta.js": 170,
+		"./te": 171,
+		"./te.js": 171,
+		"./th": 172,
+		"./th.js": 172,
+		"./tl-ph": 173,
+		"./tl-ph.js": 173,
+		"./tlh": 174,
+		"./tlh.js": 174,
+		"./tr": 175,
+		"./tr.js": 175,
+		"./tzl": 176,
+		"./tzl.js": 176,
+		"./tzm": 177,
+		"./tzm-latn": 178,
+		"./tzm-latn.js": 178,
+		"./tzm.js": 177,
+		"./uk": 179,
+		"./uk.js": 179,
+		"./uz": 180,
+		"./uz.js": 180,
+		"./vi": 181,
+		"./vi.js": 181,
+		"./x-pseudo": 182,
+		"./x-pseudo.js": 182,
+		"./zh-cn": 183,
+		"./zh-cn.js": 183,
+		"./zh-hk": 184,
+		"./zh-hk.js": 184,
+		"./zh-tw": 185,
+		"./zh-tw.js": 185
 	};
 	function webpackContext(req) {
 		return __webpack_require__(webpackContextResolve(req));
@@ -23372,27 +24114,27 @@ var birchoutline =
 	};
 	webpackContext.resolve = webpackContextResolve;
 	module.exports = webpackContext;
-	webpackContext.id = 80;
+	webpackContext.id = 81;
 
 
 /***/ },
-/* 81 */
+/* 82 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : afrikaans (af)
+	//! locale : Afrikaans [af]
 	//! author : Werner Mollentze : https://github.com/wernerm
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
 	
 	    var af = moment.defineLocale('af', {
 	        months : 'Januarie_Februarie_Maart_April_Mei_Junie_Julie_Augustus_September_Oktober_November_Desember'.split('_'),
-	        monthsShort : 'Jan_Feb_Mar_Apr_Mei_Jun_Jul_Aug_Sep_Okt_Nov_Des'.split('_'),
+	        monthsShort : 'Jan_Feb_Mrt_Apr_Mei_Jun_Jul_Aug_Sep_Okt_Nov_Des'.split('_'),
 	        weekdays : 'Sondag_Maandag_Dinsdag_Woensdag_Donderdag_Vrydag_Saterdag'.split('_'),
 	        weekdaysShort : 'Son_Maa_Din_Woe_Don_Vry_Sat'.split('_'),
 	        weekdaysMin : 'So_Ma_Di_Wo_Do_Vr_Sa'.split('_'),
@@ -23453,18 +24195,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 82 */
+/* 83 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! Locale: Arabic (ar)
-	//! Author: Abdel Said: https://github.com/abdelsaid
-	//! Changes in months, weekdays: Ahmed Elkhatib
-	//! Native plural forms: forabi https://github.com/forabi
+	//! locale : Arabic [ar]
+	//! author : Abdel Said: https://github.com/abdelsaid
+	//! author : Ahmed Elkhatib
+	//! author : forabi https://github.com/forabi
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -23594,17 +24336,143 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 83 */
+/* 84 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Moroccan Arabic (ar-ma)
+	//! locale : Arabic (Lybia) [ar-ly]
+	//! author : Ali Hmer: https://github.com/kikoanis
+	
+	;(function (global, factory) {
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
+	   factory(global.moment)
+	}(this, function (moment) { 'use strict';
+	
+	
+	    var symbolMap = {
+	        '1': '1',
+	        '2': '2',
+	        '3': '3',
+	        '4': '4',
+	        '5': '5',
+	        '6': '6',
+	        '7': '7',
+	        '8': '8',
+	        '9': '9',
+	        '0': '0'
+	    }, pluralForm = function (n) {
+	        return n === 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n % 100 >= 3 && n % 100 <= 10 ? 3 : n % 100 >= 11 ? 4 : 5;
+	    }, plurals = {
+	        s : ['أقل من ثانية', 'ثانية واحدة', ['ثانيتان', 'ثانيتين'], '%d ثوان', '%d ثانية', '%d ثانية'],
+	        m : ['أقل من دقيقة', 'دقيقة واحدة', ['دقيقتان', 'دقيقتين'], '%d دقائق', '%d دقيقة', '%d دقيقة'],
+	        h : ['أقل من ساعة', 'ساعة واحدة', ['ساعتان', 'ساعتين'], '%d ساعات', '%d ساعة', '%d ساعة'],
+	        d : ['أقل من يوم', 'يوم واحد', ['يومان', 'يومين'], '%d أيام', '%d يومًا', '%d يوم'],
+	        M : ['أقل من شهر', 'شهر واحد', ['شهران', 'شهرين'], '%d أشهر', '%d شهرا', '%d شهر'],
+	        y : ['أقل من عام', 'عام واحد', ['عامان', 'عامين'], '%d أعوام', '%d عامًا', '%d عام']
+	    }, pluralize = function (u) {
+	        return function (number, withoutSuffix, string, isFuture) {
+	            var f = pluralForm(number),
+	                str = plurals[u][pluralForm(number)];
+	            if (f === 2) {
+	                str = str[withoutSuffix ? 0 : 1];
+	            }
+	            return str.replace(/%d/i, number);
+	        };
+	    }, months = [
+	        'يناير',
+	        'فبراير',
+	        'مارس',
+	        'أبريل',
+	        'مايو',
+	        'يونيو',
+	        'يوليو',
+	        'أغسطس',
+	        'سبتمبر',
+	        'أكتوبر',
+	        'نوفمبر',
+	        'ديسمبر'
+	    ];
+	
+	    var ar_ly = moment.defineLocale('ar-ly', {
+	        months : months,
+	        monthsShort : months,
+	        weekdays : 'الأحد_الإثنين_الثلاثاء_الأربعاء_الخميس_الجمعة_السبت'.split('_'),
+	        weekdaysShort : 'أحد_إثنين_ثلاثاء_أربعاء_خميس_جمعة_سبت'.split('_'),
+	        weekdaysMin : 'ح_ن_ث_ر_خ_ج_س'.split('_'),
+	        weekdaysParseExact : true,
+	        longDateFormat : {
+	            LT : 'HH:mm',
+	            LTS : 'HH:mm:ss',
+	            L : 'D/\u200FM/\u200FYYYY',
+	            LL : 'D MMMM YYYY',
+	            LLL : 'D MMMM YYYY HH:mm',
+	            LLLL : 'dddd D MMMM YYYY HH:mm'
+	        },
+	        meridiemParse: /ص|م/,
+	        isPM : function (input) {
+	            return 'م' === input;
+	        },
+	        meridiem : function (hour, minute, isLower) {
+	            if (hour < 12) {
+	                return 'ص';
+	            } else {
+	                return 'م';
+	            }
+	        },
+	        calendar : {
+	            sameDay: '[اليوم عند الساعة] LT',
+	            nextDay: '[غدًا عند الساعة] LT',
+	            nextWeek: 'dddd [عند الساعة] LT',
+	            lastDay: '[أمس عند الساعة] LT',
+	            lastWeek: 'dddd [عند الساعة] LT',
+	            sameElse: 'L'
+	        },
+	        relativeTime : {
+	            future : 'بعد %s',
+	            past : 'منذ %s',
+	            s : pluralize('s'),
+	            m : pluralize('m'),
+	            mm : pluralize('m'),
+	            h : pluralize('h'),
+	            hh : pluralize('h'),
+	            d : pluralize('d'),
+	            dd : pluralize('d'),
+	            M : pluralize('M'),
+	            MM : pluralize('M'),
+	            y : pluralize('y'),
+	            yy : pluralize('y')
+	        },
+	        preparse: function (string) {
+	            return string.replace(/\u200f/g, '').replace(/،/g, ',');
+	        },
+	        postformat: function (string) {
+	            return string.replace(/\d/g, function (match) {
+	                return symbolMap[match];
+	            }).replace(/,/g, '،');
+	        },
+	        week : {
+	            dow : 6, // Saturday is the first day of the week.
+	            doy : 12  // The week that contains Jan 1st is the first week of the year.
+	        }
+	    });
+	
+	    return ar_ly;
+	
+	}));
+
+/***/ },
+/* 85 */
+/***/ function(module, exports, __webpack_require__) {
+
+	//! moment.js locale configuration
+	//! locale : Arabic (Morocco) [ar-ma]
 	//! author : ElFadili Yassine : https://github.com/ElFadiliY
 	//! author : Abdel Said : https://github.com/abdelsaid
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -23658,16 +24526,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 84 */
+/* 86 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Arabic Saudi Arabia (ar-sa)
+	//! locale : Arabic (Saudi Arabia) [ar-sa]
 	//! author : Suhail Alkowaileet : https://github.com/xsoh
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -23766,15 +24634,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 85 */
+/* 87 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale  : Tunisian Arabic (ar-tn)
+	//! locale  :  Arabic (Tunisia) [ar-tn]
+	//! author : Nader Toukabri : https://github.com/naderio
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -23828,16 +24697,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 86 */
+/* 88 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : azerbaijani (az)
+	//! locale : Azerbaijani [az]
 	//! author : topchiyev : https://github.com/topchiyev
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -23937,18 +24806,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 87 */
+/* 89 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : belarusian (be)
+	//! locale : Belarusian [be]
 	//! author : Dmitry Demidov : https://github.com/demidov91
 	//! author: Praleska: http://praleska.pro/
 	//! Author : Menelion Elensúle : https://github.com/Oire
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24006,15 +24875,15 @@ var birchoutline =
 	            },
 	            lastWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                case 3:
-	                case 5:
-	                case 6:
-	                    return '[У мінулую] dddd [ў] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                    return '[У мінулы] dddd [ў] LT';
+	                    case 0:
+	                    case 3:
+	                    case 5:
+	                    case 6:
+	                        return '[У мінулую] dddd [ў] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                        return '[У мінулы] dddd [ў] LT';
 	                }
 	            },
 	            sameElse: 'L'
@@ -24052,16 +24921,16 @@ var birchoutline =
 	        ordinalParse: /\d{1,2}-(і|ы|га)/,
 	        ordinal: function (number, period) {
 	            switch (period) {
-	            case 'M':
-	            case 'd':
-	            case 'DDD':
-	            case 'w':
-	            case 'W':
-	                return (number % 10 === 2 || number % 10 === 3) && (number % 100 !== 12 && number % 100 !== 13) ? number + '-і' : number + '-ы';
-	            case 'D':
-	                return number + '-га';
-	            default:
-	                return number;
+	                case 'M':
+	                case 'd':
+	                case 'DDD':
+	                case 'w':
+	                case 'W':
+	                    return (number % 10 === 2 || number % 10 === 3) && (number % 100 !== 12 && number % 100 !== 13) ? number + '-і' : number + '-ы';
+	                case 'D':
+	                    return number + '-га';
+	                default:
+	                    return number;
 	            }
 	        },
 	        week : {
@@ -24075,16 +24944,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 88 */
+/* 90 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : bulgarian (bg)
+	//! locale : Bulgarian [bg]
 	//! author : Krasen Borisov : https://github.com/kraz
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24110,15 +24979,15 @@ var birchoutline =
 	            lastDay : '[Вчера в] LT',
 	            lastWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                case 3:
-	                case 6:
-	                    return '[В изминалата] dddd [в] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[В изминалия] dddd [в] LT';
+	                    case 0:
+	                    case 3:
+	                    case 6:
+	                        return '[В изминалата] dddd [в] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[В изминалия] dddd [в] LT';
 	                }
 	            },
 	            sameElse : 'L'
@@ -24169,16 +25038,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 89 */
+/* 91 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Bengali (bn)
+	//! locale : Bengali [bn]
 	//! author : Kaushik Gandhi : https://github.com/kaushikgandhi
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24209,11 +25078,11 @@ var birchoutline =
 	    };
 	
 	    var bn = moment.defineLocale('bn', {
-	        months : 'জানুয়ারী_ফেবুয়ারী_মার্চ_এপ্রিল_মে_জুন_জুলাই_অগাস্ট_সেপ্টেম্বর_অক্টোবর_নভেম্বর_ডিসেম্বর'.split('_'),
-	        monthsShort : 'জানু_ফেব_মার্চ_এপর_মে_জুন_জুল_অগ_সেপ্ট_অক্টো_নভ_ডিসেম্'.split('_'),
-	        weekdays : 'রবিবার_সোমবার_মঙ্গলবার_বুধবার_বৃহস্পত্তিবার_শুক্রবার_শনিবার'.split('_'),
-	        weekdaysShort : 'রবি_সোম_মঙ্গল_বুধ_বৃহস্পত্তি_শুক্র_শনি'.split('_'),
-	        weekdaysMin : 'রব_সম_মঙ্গ_বু_ব্রিহ_শু_শনি'.split('_'),
+	        months : 'জানুয়ারী_ফেব্রুয়ারি_মার্চ_এপ্রিল_মে_জুন_জুলাই_আগস্ট_সেপ্টেম্বর_অক্টোবর_নভেম্বর_ডিসেম্বর'.split('_'),
+	        monthsShort : 'জানু_ফেব_মার্চ_এপ্র_মে_জুন_জুল_আগ_সেপ্ট_অক্টো_নভে_ডিসে'.split('_'),
+	        weekdays : 'রবিবার_সোমবার_মঙ্গলবার_বুধবার_বৃহস্পতিবার_শুক্রবার_শনিবার'.split('_'),
+	        weekdaysShort : 'রবি_সোম_মঙ্গল_বুধ_বৃহস্পতি_শুক্র_শনি'.split('_'),
+	        weekdaysMin : 'রবি_সোম_মঙ্গ_বুধ_বৃহঃ_শুক্র_শনি'.split('_'),
 	        longDateFormat : {
 	            LT : 'A h:mm সময়',
 	            LTS : 'A h:mm:ss সময়',
@@ -24292,16 +25161,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 90 */
+/* 92 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : tibetan (bo)
+	//! locale : Tibetan [bo]
 	//! author : Thupten N. Chakrishar : https://github.com/vajradog
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24415,16 +25284,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 91 */
+/* 93 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : breton (br)
+	//! locale : Breton [br]
 	//! author : Jean-Baptiste Le Duigou : https://github.com/jbleduigou
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24439,14 +25308,14 @@ var birchoutline =
 	    }
 	    function specialMutationForYears(number) {
 	        switch (lastNumber(number)) {
-	        case 1:
-	        case 3:
-	        case 4:
-	        case 5:
-	        case 9:
-	            return number + ' bloaz';
-	        default:
-	            return number + ' vloaz';
+	            case 1:
+	            case 3:
+	            case 4:
+	            case 5:
+	            case 9:
+	                return number + ' bloaz';
+	            default:
+	                return number + ' vloaz';
 	        }
 	    }
 	    function lastNumber(number) {
@@ -24527,17 +25396,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 92 */
+/* 94 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : bosnian (bs)
+	//! locale : Bosnian [bs]
 	//! author : Nedim Cholich : https://github.com/frontyard
 	//! based on (hr) translation by Bojan Marković
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24545,53 +25414,53 @@ var birchoutline =
 	    function translate(number, withoutSuffix, key) {
 	        var result = number + ' ';
 	        switch (key) {
-	        case 'm':
-	            return withoutSuffix ? 'jedna minuta' : 'jedne minute';
-	        case 'mm':
-	            if (number === 1) {
-	                result += 'minuta';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'minute';
-	            } else {
-	                result += 'minuta';
-	            }
-	            return result;
-	        case 'h':
-	            return withoutSuffix ? 'jedan sat' : 'jednog sata';
-	        case 'hh':
-	            if (number === 1) {
-	                result += 'sat';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'sata';
-	            } else {
-	                result += 'sati';
-	            }
-	            return result;
-	        case 'dd':
-	            if (number === 1) {
-	                result += 'dan';
-	            } else {
-	                result += 'dana';
-	            }
-	            return result;
-	        case 'MM':
-	            if (number === 1) {
-	                result += 'mjesec';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'mjeseca';
-	            } else {
-	                result += 'mjeseci';
-	            }
-	            return result;
-	        case 'yy':
-	            if (number === 1) {
-	                result += 'godina';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'godine';
-	            } else {
-	                result += 'godina';
-	            }
-	            return result;
+	            case 'm':
+	                return withoutSuffix ? 'jedna minuta' : 'jedne minute';
+	            case 'mm':
+	                if (number === 1) {
+	                    result += 'minuta';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'minute';
+	                } else {
+	                    result += 'minuta';
+	                }
+	                return result;
+	            case 'h':
+	                return withoutSuffix ? 'jedan sat' : 'jednog sata';
+	            case 'hh':
+	                if (number === 1) {
+	                    result += 'sat';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'sata';
+	                } else {
+	                    result += 'sati';
+	                }
+	                return result;
+	            case 'dd':
+	                if (number === 1) {
+	                    result += 'dan';
+	                } else {
+	                    result += 'dana';
+	                }
+	                return result;
+	            case 'MM':
+	                if (number === 1) {
+	                    result += 'mjesec';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'mjeseca';
+	                } else {
+	                    result += 'mjeseci';
+	                }
+	                return result;
+	            case 'yy':
+	                if (number === 1) {
+	                    result += 'godina';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'godine';
+	                } else {
+	                    result += 'godina';
+	                }
+	                return result;
 	        }
 	    }
 	
@@ -24606,7 +25475,7 @@ var birchoutline =
 	        longDateFormat : {
 	            LT : 'H:mm',
 	            LTS : 'H:mm:ss',
-	            L : 'DD. MM. YYYY',
+	            L : 'DD.MM.YYYY',
 	            LL : 'D. MMMM YYYY',
 	            LLL : 'D. MMMM YYYY H:mm',
 	            LLLL : 'dddd, D. MMMM YYYY H:mm'
@@ -24616,32 +25485,32 @@ var birchoutline =
 	            nextDay  : '[sutra u] LT',
 	            nextWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[u] [nedjelju] [u] LT';
-	                case 3:
-	                    return '[u] [srijedu] [u] LT';
-	                case 6:
-	                    return '[u] [subotu] [u] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[u] dddd [u] LT';
+	                    case 0:
+	                        return '[u] [nedjelju] [u] LT';
+	                    case 3:
+	                        return '[u] [srijedu] [u] LT';
+	                    case 6:
+	                        return '[u] [subotu] [u] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[u] dddd [u] LT';
 	                }
 	            },
 	            lastDay  : '[jučer u] LT',
 	            lastWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                case 3:
-	                    return '[prošlu] dddd [u] LT';
-	                case 6:
-	                    return '[prošle] [subote] [u] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[prošli] dddd [u] LT';
+	                    case 0:
+	                    case 3:
+	                        return '[prošlu] dddd [u] LT';
+	                    case 6:
+	                        return '[prošle] [subote] [u] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[prošli] dddd [u] LT';
 	                }
 	            },
 	            sameElse : 'L'
@@ -24674,16 +25543,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 93 */
+/* 95 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : catalan (ca)
+	//! locale : Catalan [ca]
 	//! author : Juan G. Hurtado : https://github.com/juanghurtado
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24759,16 +25628,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 94 */
+/* 96 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : czech (cs)
+	//! locale : Czech [cs]
 	//! author : petrbela : https://github.com/petrbela
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -24781,53 +25650,53 @@ var birchoutline =
 	    function translate(number, withoutSuffix, key, isFuture) {
 	        var result = number + ' ';
 	        switch (key) {
-	        case 's':  // a few seconds / in a few seconds / a few seconds ago
-	            return (withoutSuffix || isFuture) ? 'pár sekund' : 'pár sekundami';
-	        case 'm':  // a minute / in a minute / a minute ago
-	            return withoutSuffix ? 'minuta' : (isFuture ? 'minutu' : 'minutou');
-	        case 'mm': // 9 minutes / in 9 minutes / 9 minutes ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'minuty' : 'minut');
-	            } else {
-	                return result + 'minutami';
-	            }
-	            break;
-	        case 'h':  // an hour / in an hour / an hour ago
-	            return withoutSuffix ? 'hodina' : (isFuture ? 'hodinu' : 'hodinou');
-	        case 'hh': // 9 hours / in 9 hours / 9 hours ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'hodiny' : 'hodin');
-	            } else {
-	                return result + 'hodinami';
-	            }
-	            break;
-	        case 'd':  // a day / in a day / a day ago
-	            return (withoutSuffix || isFuture) ? 'den' : 'dnem';
-	        case 'dd': // 9 days / in 9 days / 9 days ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'dny' : 'dní');
-	            } else {
-	                return result + 'dny';
-	            }
-	            break;
-	        case 'M':  // a month / in a month / a month ago
-	            return (withoutSuffix || isFuture) ? 'měsíc' : 'měsícem';
-	        case 'MM': // 9 months / in 9 months / 9 months ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'měsíce' : 'měsíců');
-	            } else {
-	                return result + 'měsíci';
-	            }
-	            break;
-	        case 'y':  // a year / in a year / a year ago
-	            return (withoutSuffix || isFuture) ? 'rok' : 'rokem';
-	        case 'yy': // 9 years / in 9 years / 9 years ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'roky' : 'let');
-	            } else {
-	                return result + 'lety';
-	            }
-	            break;
+	            case 's':  // a few seconds / in a few seconds / a few seconds ago
+	                return (withoutSuffix || isFuture) ? 'pár sekund' : 'pár sekundami';
+	            case 'm':  // a minute / in a minute / a minute ago
+	                return withoutSuffix ? 'minuta' : (isFuture ? 'minutu' : 'minutou');
+	            case 'mm': // 9 minutes / in 9 minutes / 9 minutes ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'minuty' : 'minut');
+	                } else {
+	                    return result + 'minutami';
+	                }
+	                break;
+	            case 'h':  // an hour / in an hour / an hour ago
+	                return withoutSuffix ? 'hodina' : (isFuture ? 'hodinu' : 'hodinou');
+	            case 'hh': // 9 hours / in 9 hours / 9 hours ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'hodiny' : 'hodin');
+	                } else {
+	                    return result + 'hodinami';
+	                }
+	                break;
+	            case 'd':  // a day / in a day / a day ago
+	                return (withoutSuffix || isFuture) ? 'den' : 'dnem';
+	            case 'dd': // 9 days / in 9 days / 9 days ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'dny' : 'dní');
+	                } else {
+	                    return result + 'dny';
+	                }
+	                break;
+	            case 'M':  // a month / in a month / a month ago
+	                return (withoutSuffix || isFuture) ? 'měsíc' : 'měsícem';
+	            case 'MM': // 9 months / in 9 months / 9 months ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'měsíce' : 'měsíců');
+	                } else {
+	                    return result + 'měsíci';
+	                }
+	                break;
+	            case 'y':  // a year / in a year / a year ago
+	                return (withoutSuffix || isFuture) ? 'rok' : 'rokem';
+	            case 'yy': // 9 years / in 9 years / 9 years ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'roky' : 'let');
+	                } else {
+	                    return result + 'lety';
+	                }
+	                break;
 	        }
 	    }
 	
@@ -24865,43 +25734,44 @@ var birchoutline =
 	            L : 'DD.MM.YYYY',
 	            LL : 'D. MMMM YYYY',
 	            LLL : 'D. MMMM YYYY H:mm',
-	            LLLL : 'dddd D. MMMM YYYY H:mm'
+	            LLLL : 'dddd D. MMMM YYYY H:mm',
+	            l : 'D. M. YYYY'
 	        },
 	        calendar : {
 	            sameDay: '[dnes v] LT',
 	            nextDay: '[zítra v] LT',
 	            nextWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[v neděli v] LT';
-	                case 1:
-	                case 2:
-	                    return '[v] dddd [v] LT';
-	                case 3:
-	                    return '[ve středu v] LT';
-	                case 4:
-	                    return '[ve čtvrtek v] LT';
-	                case 5:
-	                    return '[v pátek v] LT';
-	                case 6:
-	                    return '[v sobotu v] LT';
+	                    case 0:
+	                        return '[v neděli v] LT';
+	                    case 1:
+	                    case 2:
+	                        return '[v] dddd [v] LT';
+	                    case 3:
+	                        return '[ve středu v] LT';
+	                    case 4:
+	                        return '[ve čtvrtek v] LT';
+	                    case 5:
+	                        return '[v pátek v] LT';
+	                    case 6:
+	                        return '[v sobotu v] LT';
 	                }
 	            },
 	            lastDay: '[včera v] LT',
 	            lastWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[minulou neděli v] LT';
-	                case 1:
-	                case 2:
-	                    return '[minulé] dddd [v] LT';
-	                case 3:
-	                    return '[minulou středu v] LT';
-	                case 4:
-	                case 5:
-	                    return '[minulý] dddd [v] LT';
-	                case 6:
-	                    return '[minulou sobotu v] LT';
+	                    case 0:
+	                        return '[minulou neděli v] LT';
+	                    case 1:
+	                    case 2:
+	                        return '[minulé] dddd [v] LT';
+	                    case 3:
+	                        return '[minulou středu v] LT';
+	                    case 4:
+	                    case 5:
+	                        return '[minulý] dddd [v] LT';
+	                    case 6:
+	                        return '[minulou sobotu v] LT';
 	                }
 	            },
 	            sameElse: 'L'
@@ -24934,16 +25804,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 95 */
+/* 97 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : chuvash (cv)
+	//! locale : Chuvash [cv]
 	//! author : Anatoly Mironov : https://github.com/mirontoli
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25001,16 +25871,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 96 */
+/* 98 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Welsh (cy)
-	//! author : Robert Allen
+	//! locale : Welsh [cy]
+	//! author : Robert Allen : https://github.com/robgallen
+	//! author : https://github.com/ryangreaves
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25085,16 +25956,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 97 */
+/* 99 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : danish (da)
+	//! locale : Danish [da]
 	//! author : Ulrik Nielsen : https://github.com/mrbase
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25149,18 +26020,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 98 */
+/* 100 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : german (de)
+	//! locale : German [de]
 	//! author : lluchs : https://github.com/lluchs
 	//! author: Menelion Elensúle: https://github.com/Oire
 	//! author : Mikolaj Dadela : https://github.com/mik01aj
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25231,19 +26102,19 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 99 */
+/* 101 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : austrian german (de-at)
+	//! locale : German (Austria) [de-at]
 	//! author : lluchs : https://github.com/lluchs
 	//! author: Menelion Elensúle: https://github.com/Oire
 	//! author : Martin Groller : https://github.com/MadMG
 	//! author : Mikolaj Dadela : https://github.com/mik01aj
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25314,16 +26185,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 100 */
+/* 102 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : dhivehi (dv)
+	//! locale : Maldivian [dv]
 	//! author : Jawish Hameed : https://github.com/jawish
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25417,16 +26288,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 101 */
+/* 103 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : modern greek (el)
+	//! locale : Greek [el]
 	//! author : Aggelos Karalias : https://github.com/mehiel
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25519,15 +26390,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 102 */
+/* 104 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : australian english (en-au)
+	//! locale : English (Australia) [en-au]
+	//! author : Jared Morse : https://github.com/jarcoal
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25589,16 +26461,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 103 */
+/* 105 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : canadian english (en-ca)
+	//! locale : English (Canada) [en-ca]
 	//! author : Jonathan Abourbih : https://github.com/jonbca
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25656,16 +26528,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 104 */
+/* 106 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : great britain english (en-gb)
+	//! locale : English (United Kingdom) [en-gb]
 	//! author : Chris Gedrim : https://github.com/chrisgedrim
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25727,16 +26599,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 105 */
+/* 107 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Irish english (en-ie)
+	//! locale : English (Ireland) [en-ie]
 	//! author : Chris Cartlidge : https://github.com/chriscartlidge
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25798,15 +26670,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 106 */
+/* 108 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : New Zealand english (en-nz)
+	//! locale : English (New Zealand) [en-nz]
+	//! author : Luke McGregor : https://github.com/lukemcgregor
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25868,18 +26741,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 107 */
+/* 109 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : esperanto (eo)
+	//! locale : Esperanto [eo]
 	//! author : Colin Dean : https://github.com/colindean
 	//! komento: Mi estas malcerta se mi korekte traktis akuzativojn en tiu traduko.
 	//!          Se ne, bonvolu korekti kaj avizi min por ke mi povas lerni!
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -25945,16 +26818,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 108 */
+/* 110 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : spanish (es)
+	//! locale : Spanish [es]
 	//! author : Julio Napurí : https://github.com/julionc
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26030,17 +26903,101 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 109 */
+/* 111 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : estonian (et)
+	//! locale : Spanish (Dominican Republic) [es-do]
+	
+	;(function (global, factory) {
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
+	   factory(global.moment)
+	}(this, function (moment) { 'use strict';
+	
+	
+	    var monthsShortDot = 'ene._feb._mar._abr._may._jun._jul._ago._sep._oct._nov._dic.'.split('_'),
+	        monthsShort = 'ene_feb_mar_abr_may_jun_jul_ago_sep_oct_nov_dic'.split('_');
+	
+	    var es_do = moment.defineLocale('es-do', {
+	        months : 'enero_febrero_marzo_abril_mayo_junio_julio_agosto_septiembre_octubre_noviembre_diciembre'.split('_'),
+	        monthsShort : function (m, format) {
+	            if (/-MMM-/.test(format)) {
+	                return monthsShort[m.month()];
+	            } else {
+	                return monthsShortDot[m.month()];
+	            }
+	        },
+	        monthsParseExact : true,
+	        weekdays : 'domingo_lunes_martes_miércoles_jueves_viernes_sábado'.split('_'),
+	        weekdaysShort : 'dom._lun._mar._mié._jue._vie._sáb.'.split('_'),
+	        weekdaysMin : 'do_lu_ma_mi_ju_vi_sá'.split('_'),
+	        weekdaysParseExact : true,
+	        longDateFormat : {
+	            LT : 'h:mm A',
+	            LTS : 'h:mm:ss A',
+	            L : 'DD/MM/YYYY',
+	            LL : 'D [de] MMMM [de] YYYY',
+	            LLL : 'D [de] MMMM [de] YYYY h:mm A',
+	            LLLL : 'dddd, D [de] MMMM [de] YYYY h:mm A'
+	        },
+	        calendar : {
+	            sameDay : function () {
+	                return '[hoy a la' + ((this.hours() !== 1) ? 's' : '') + '] LT';
+	            },
+	            nextDay : function () {
+	                return '[mañana a la' + ((this.hours() !== 1) ? 's' : '') + '] LT';
+	            },
+	            nextWeek : function () {
+	                return 'dddd [a la' + ((this.hours() !== 1) ? 's' : '') + '] LT';
+	            },
+	            lastDay : function () {
+	                return '[ayer a la' + ((this.hours() !== 1) ? 's' : '') + '] LT';
+	            },
+	            lastWeek : function () {
+	                return '[el] dddd [pasado a la' + ((this.hours() !== 1) ? 's' : '') + '] LT';
+	            },
+	            sameElse : 'L'
+	        },
+	        relativeTime : {
+	            future : 'en %s',
+	            past : 'hace %s',
+	            s : 'unos segundos',
+	            m : 'un minuto',
+	            mm : '%d minutos',
+	            h : 'una hora',
+	            hh : '%d horas',
+	            d : 'un día',
+	            dd : '%d días',
+	            M : 'un mes',
+	            MM : '%d meses',
+	            y : 'un año',
+	            yy : '%d años'
+	        },
+	        ordinalParse : /\d{1,2}º/,
+	        ordinal : '%dº',
+	        week : {
+	            dow : 1, // Monday is the first day of the week.
+	            doy : 4  // The week that contains Jan 4th is the first week of the year.
+	        }
+	    });
+	
+	    return es_do;
+	
+	}));
+
+/***/ },
+/* 112 */
+/***/ function(module, exports, __webpack_require__) {
+
+	//! moment.js locale configuration
+	//! locale : Estonian [et]
 	//! author : Henry Kehlmann : https://github.com/madhenry
 	//! improvements : Illimar Tambek : https://github.com/ragulka
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26114,16 +27071,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 110 */
+/* 113 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : euskara (eu)
+	//! locale : Basque [eu]
 	//! author : Eneko Illarramendi : https://github.com/eillarra
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26184,16 +27141,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 111 */
+/* 114 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Persian (fa)
+	//! locale : Persian [fa]
 	//! author : Ebrahim Byagowi : https://github.com/ebraminio
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26294,16 +27251,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 112 */
+/* 115 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : finnish (fi)
+	//! locale : Finnish [fi]
 	//! author : Tarmo Aidantausta : https://github.com/bleadof
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26316,33 +27273,33 @@ var birchoutline =
 	    function translate(number, withoutSuffix, key, isFuture) {
 	        var result = '';
 	        switch (key) {
-	        case 's':
-	            return isFuture ? 'muutaman sekunnin' : 'muutama sekunti';
-	        case 'm':
-	            return isFuture ? 'minuutin' : 'minuutti';
-	        case 'mm':
-	            result = isFuture ? 'minuutin' : 'minuuttia';
-	            break;
-	        case 'h':
-	            return isFuture ? 'tunnin' : 'tunti';
-	        case 'hh':
-	            result = isFuture ? 'tunnin' : 'tuntia';
-	            break;
-	        case 'd':
-	            return isFuture ? 'päivän' : 'päivä';
-	        case 'dd':
-	            result = isFuture ? 'päivän' : 'päivää';
-	            break;
-	        case 'M':
-	            return isFuture ? 'kuukauden' : 'kuukausi';
-	        case 'MM':
-	            result = isFuture ? 'kuukauden' : 'kuukautta';
-	            break;
-	        case 'y':
-	            return isFuture ? 'vuoden' : 'vuosi';
-	        case 'yy':
-	            result = isFuture ? 'vuoden' : 'vuotta';
-	            break;
+	            case 's':
+	                return isFuture ? 'muutaman sekunnin' : 'muutama sekunti';
+	            case 'm':
+	                return isFuture ? 'minuutin' : 'minuutti';
+	            case 'mm':
+	                result = isFuture ? 'minuutin' : 'minuuttia';
+	                break;
+	            case 'h':
+	                return isFuture ? 'tunnin' : 'tunti';
+	            case 'hh':
+	                result = isFuture ? 'tunnin' : 'tuntia';
+	                break;
+	            case 'd':
+	                return isFuture ? 'päivän' : 'päivä';
+	            case 'dd':
+	                result = isFuture ? 'päivän' : 'päivää';
+	                break;
+	            case 'M':
+	                return isFuture ? 'kuukauden' : 'kuukausi';
+	            case 'MM':
+	                result = isFuture ? 'kuukauden' : 'kuukautta';
+	                break;
+	            case 'y':
+	                return isFuture ? 'vuoden' : 'vuosi';
+	            case 'yy':
+	                result = isFuture ? 'vuoden' : 'vuotta';
+	                break;
 	        }
 	        result = verbalNumber(number, isFuture) + ' ' + result;
 	        return result;
@@ -26405,16 +27362,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 113 */
+/* 116 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : faroese (fo)
+	//! locale : Faroese [fo]
 	//! author : Ragnar Johannesen : https://github.com/ragnar123
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26469,16 +27426,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 114 */
+/* 117 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : french (fr)
+	//! locale : French [fr]
 	//! author : John Fischer : https://github.com/jfroffice
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26537,16 +27494,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 115 */
+/* 118 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : canadian french (fr-ca)
+	//! locale : French (Canada) [fr-ca]
 	//! author : Jonathan Abourbih : https://github.com/jonbca
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26601,16 +27558,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 116 */
+/* 119 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : swiss french (fr)
+	//! locale : French (Switzerland) [fr-ch]
 	//! author : Gaspard Bucher : https://github.com/gaspard
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26669,16 +27626,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 117 */
+/* 120 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : frisian (fy)
+	//! locale : Frisian [fy]
 	//! author : Robin van der Vliet : https://github.com/robin0van0der0v
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26746,16 +27703,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 118 */
+/* 121 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : great britain scottish gealic (gd)
+	//! locale : Scottish Gaelic [gd]
 	//! author : Jon Ashdown : https://github.com/jonashdown
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -26826,35 +27783,35 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 119 */
+/* 122 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : galician (gl)
+	//! locale : Galician [gl]
 	//! author : Juan G. Hurtado : https://github.com/juanghurtado
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
 	
 	    var gl = moment.defineLocale('gl', {
-	        months : 'Xaneiro_Febreiro_Marzo_Abril_Maio_Xuño_Xullo_Agosto_Setembro_Outubro_Novembro_Decembro'.split('_'),
-	        monthsShort : 'Xan._Feb._Mar._Abr._Mai._Xuñ._Xul._Ago._Set._Out._Nov._Dec.'.split('_'),
+	        months : 'xaneiro_febreiro_marzo_abril_maio_xuño_xullo_agosto_setembro_outubro_novembro_decembro'.split('_'),
+	        monthsShort : 'xan._feb._mar._abr._mai._xuñ._xul._ago._set._out._nov._dec.'.split('_'),
 	        monthsParseExact: true,
-	        weekdays : 'Domingo_Luns_Martes_Mércores_Xoves_Venres_Sábado'.split('_'),
-	        weekdaysShort : 'Dom._Lun._Mar._Mér._Xov._Ven._Sáb.'.split('_'),
-	        weekdaysMin : 'Do_Lu_Ma_Mé_Xo_Ve_Sá'.split('_'),
+	        weekdays : 'domingo_luns_martes_mércores_xoves_venres_sábado'.split('_'),
+	        weekdaysShort : 'dom._lun._mar._mér._xov._ven._sáb.'.split('_'),
+	        weekdaysMin : 'do_lu_ma_mé_xo_ve_sá'.split('_'),
 	        weekdaysParseExact : true,
 	        longDateFormat : {
 	            LT : 'H:mm',
 	            LTS : 'H:mm:ss',
 	            L : 'DD/MM/YYYY',
-	            LL : 'D MMMM YYYY',
-	            LLL : 'D MMMM YYYY H:mm',
-	            LLLL : 'dddd D MMMM YYYY H:mm'
+	            LL : 'D [de] MMMM [de] YYYY',
+	            LLL : 'D [de] MMMM [de] YYYY H:mm',
+	            LLLL : 'dddd, D [de] MMMM [de] YYYY H:mm'
 	        },
 	        calendar : {
 	            sameDay : function () {
@@ -26876,8 +27833,8 @@ var birchoutline =
 	        },
 	        relativeTime : {
 	            future : function (str) {
-	                if (str === 'uns segundos') {
-	                    return 'nuns segundos';
+	                if (str.indexOf('un') === 0) {
+	                    return 'n' + str;
 	                }
 	                return 'en ' + str;
 	            },
@@ -26898,7 +27855,7 @@ var birchoutline =
 	        ordinal : '%dº',
 	        week : {
 	            dow : 1, // Monday is the first day of the week.
-	            doy : 7  // The week that contains Jan 1st is the first week of the year.
+	            doy : 4  // The week that contains Jan 4th is the first week of the year.
 	        }
 	    });
 	
@@ -26907,18 +27864,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 120 */
+/* 123 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Hebrew (he)
+	//! locale : Hebrew [he]
 	//! author : Tomer Cohen : https://github.com/tomer
 	//! author : Moshe Simantov : https://github.com/DevelopmentIL
 	//! author : Tal Ater : https://github.com/TalAter
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27010,16 +27967,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 121 */
+/* 124 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : hindi (hi)
+	//! locale : Hindi [hi]
 	//! author : Mayank Singhal : https://github.com/mayanksinghal
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27138,16 +28095,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 122 */
+/* 125 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : hrvatski (hr)
+	//! locale : Croatian [hr]
 	//! author : Bojan Marković : https://github.com/bmarkovic
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27155,53 +28112,53 @@ var birchoutline =
 	    function translate(number, withoutSuffix, key) {
 	        var result = number + ' ';
 	        switch (key) {
-	        case 'm':
-	            return withoutSuffix ? 'jedna minuta' : 'jedne minute';
-	        case 'mm':
-	            if (number === 1) {
-	                result += 'minuta';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'minute';
-	            } else {
-	                result += 'minuta';
-	            }
-	            return result;
-	        case 'h':
-	            return withoutSuffix ? 'jedan sat' : 'jednog sata';
-	        case 'hh':
-	            if (number === 1) {
-	                result += 'sat';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'sata';
-	            } else {
-	                result += 'sati';
-	            }
-	            return result;
-	        case 'dd':
-	            if (number === 1) {
-	                result += 'dan';
-	            } else {
-	                result += 'dana';
-	            }
-	            return result;
-	        case 'MM':
-	            if (number === 1) {
-	                result += 'mjesec';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'mjeseca';
-	            } else {
-	                result += 'mjeseci';
-	            }
-	            return result;
-	        case 'yy':
-	            if (number === 1) {
-	                result += 'godina';
-	            } else if (number === 2 || number === 3 || number === 4) {
-	                result += 'godine';
-	            } else {
-	                result += 'godina';
-	            }
-	            return result;
+	            case 'm':
+	                return withoutSuffix ? 'jedna minuta' : 'jedne minute';
+	            case 'mm':
+	                if (number === 1) {
+	                    result += 'minuta';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'minute';
+	                } else {
+	                    result += 'minuta';
+	                }
+	                return result;
+	            case 'h':
+	                return withoutSuffix ? 'jedan sat' : 'jednog sata';
+	            case 'hh':
+	                if (number === 1) {
+	                    result += 'sat';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'sata';
+	                } else {
+	                    result += 'sati';
+	                }
+	                return result;
+	            case 'dd':
+	                if (number === 1) {
+	                    result += 'dan';
+	                } else {
+	                    result += 'dana';
+	                }
+	                return result;
+	            case 'MM':
+	                if (number === 1) {
+	                    result += 'mjesec';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'mjeseca';
+	                } else {
+	                    result += 'mjeseci';
+	                }
+	                return result;
+	            case 'yy':
+	                if (number === 1) {
+	                    result += 'godina';
+	                } else if (number === 2 || number === 3 || number === 4) {
+	                    result += 'godine';
+	                } else {
+	                    result += 'godina';
+	                }
+	                return result;
 	        }
 	    }
 	
@@ -27219,7 +28176,7 @@ var birchoutline =
 	        longDateFormat : {
 	            LT : 'H:mm',
 	            LTS : 'H:mm:ss',
-	            L : 'DD. MM. YYYY',
+	            L : 'DD.MM.YYYY',
 	            LL : 'D. MMMM YYYY',
 	            LLL : 'D. MMMM YYYY H:mm',
 	            LLLL : 'dddd, D. MMMM YYYY H:mm'
@@ -27229,32 +28186,32 @@ var birchoutline =
 	            nextDay  : '[sutra u] LT',
 	            nextWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[u] [nedjelju] [u] LT';
-	                case 3:
-	                    return '[u] [srijedu] [u] LT';
-	                case 6:
-	                    return '[u] [subotu] [u] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[u] dddd [u] LT';
+	                    case 0:
+	                        return '[u] [nedjelju] [u] LT';
+	                    case 3:
+	                        return '[u] [srijedu] [u] LT';
+	                    case 6:
+	                        return '[u] [subotu] [u] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[u] dddd [u] LT';
 	                }
 	            },
 	            lastDay  : '[jučer u] LT',
 	            lastWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                case 3:
-	                    return '[prošlu] dddd [u] LT';
-	                case 6:
-	                    return '[prošle] [subote] [u] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[prošli] dddd [u] LT';
+	                    case 0:
+	                    case 3:
+	                        return '[prošlu] dddd [u] LT';
+	                    case 6:
+	                        return '[prošle] [subote] [u] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[prošli] dddd [u] LT';
 	                }
 	            },
 	            sameElse : 'L'
@@ -27287,16 +28244,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 123 */
+/* 126 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : hungarian (hu)
+	//! locale : Hungarian [hu]
 	//! author : Adam Brunner : https://github.com/adambrunner
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27306,28 +28263,28 @@ var birchoutline =
 	        var num = number,
 	            suffix;
 	        switch (key) {
-	        case 's':
-	            return (isFuture || withoutSuffix) ? 'néhány másodperc' : 'néhány másodperce';
-	        case 'm':
-	            return 'egy' + (isFuture || withoutSuffix ? ' perc' : ' perce');
-	        case 'mm':
-	            return num + (isFuture || withoutSuffix ? ' perc' : ' perce');
-	        case 'h':
-	            return 'egy' + (isFuture || withoutSuffix ? ' óra' : ' órája');
-	        case 'hh':
-	            return num + (isFuture || withoutSuffix ? ' óra' : ' órája');
-	        case 'd':
-	            return 'egy' + (isFuture || withoutSuffix ? ' nap' : ' napja');
-	        case 'dd':
-	            return num + (isFuture || withoutSuffix ? ' nap' : ' napja');
-	        case 'M':
-	            return 'egy' + (isFuture || withoutSuffix ? ' hónap' : ' hónapja');
-	        case 'MM':
-	            return num + (isFuture || withoutSuffix ? ' hónap' : ' hónapja');
-	        case 'y':
-	            return 'egy' + (isFuture || withoutSuffix ? ' év' : ' éve');
-	        case 'yy':
-	            return num + (isFuture || withoutSuffix ? ' év' : ' éve');
+	            case 's':
+	                return (isFuture || withoutSuffix) ? 'néhány másodperc' : 'néhány másodperce';
+	            case 'm':
+	                return 'egy' + (isFuture || withoutSuffix ? ' perc' : ' perce');
+	            case 'mm':
+	                return num + (isFuture || withoutSuffix ? ' perc' : ' perce');
+	            case 'h':
+	                return 'egy' + (isFuture || withoutSuffix ? ' óra' : ' órája');
+	            case 'hh':
+	                return num + (isFuture || withoutSuffix ? ' óra' : ' órája');
+	            case 'd':
+	                return 'egy' + (isFuture || withoutSuffix ? ' nap' : ' napja');
+	            case 'dd':
+	                return num + (isFuture || withoutSuffix ? ' nap' : ' napja');
+	            case 'M':
+	                return 'egy' + (isFuture || withoutSuffix ? ' hónap' : ' hónapja');
+	            case 'MM':
+	                return num + (isFuture || withoutSuffix ? ' hónap' : ' hónapja');
+	            case 'y':
+	                return 'egy' + (isFuture || withoutSuffix ? ' év' : ' éve');
+	            case 'yy':
+	                return num + (isFuture || withoutSuffix ? ' év' : ' éve');
 	        }
 	        return '';
 	    }
@@ -27400,16 +28357,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 124 */
+/* 127 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Armenian (hy-am)
+	//! locale : Armenian [hy-am]
 	//! author : Armendarabyan : https://github.com/armendarabyan
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27476,16 +28433,16 @@ var birchoutline =
 	        ordinalParse: /\d{1,2}|\d{1,2}-(ին|րդ)/,
 	        ordinal: function (number, period) {
 	            switch (period) {
-	            case 'DDD':
-	            case 'w':
-	            case 'W':
-	            case 'DDDo':
-	                if (number === 1) {
-	                    return number + '-ին';
-	                }
-	                return number + '-րդ';
-	            default:
-	                return number;
+	                case 'DDD':
+	                case 'w':
+	                case 'W':
+	                case 'DDDo':
+	                    if (number === 1) {
+	                        return number + '-ին';
+	                    }
+	                    return number + '-րդ';
+	                default:
+	                    return number;
 	            }
 	        },
 	        week : {
@@ -27499,17 +28456,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 125 */
+/* 128 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Bahasa Indonesia (id)
+	//! locale : Indonesian [id]
 	//! author : Mohammad Satrio Utomo : https://github.com/tyok
 	//! reference: http://id.wikisource.org/wiki/Pedoman_Umum_Ejaan_Bahasa_Indonesia_yang_Disempurnakan
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27586,16 +28543,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 126 */
+/* 129 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : icelandic (is)
+	//! locale : Icelandic [is]
 	//! author : Hinrik Örn Sigurðsson : https://github.com/hinrik
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27611,59 +28568,59 @@ var birchoutline =
 	    function translate(number, withoutSuffix, key, isFuture) {
 	        var result = number + ' ';
 	        switch (key) {
-	        case 's':
-	            return withoutSuffix || isFuture ? 'nokkrar sekúndur' : 'nokkrum sekúndum';
-	        case 'm':
-	            return withoutSuffix ? 'mínúta' : 'mínútu';
-	        case 'mm':
-	            if (plural(number)) {
-	                return result + (withoutSuffix || isFuture ? 'mínútur' : 'mínútum');
-	            } else if (withoutSuffix) {
-	                return result + 'mínúta';
-	            }
-	            return result + 'mínútu';
-	        case 'hh':
-	            if (plural(number)) {
-	                return result + (withoutSuffix || isFuture ? 'klukkustundir' : 'klukkustundum');
-	            }
-	            return result + 'klukkustund';
-	        case 'd':
-	            if (withoutSuffix) {
-	                return 'dagur';
-	            }
-	            return isFuture ? 'dag' : 'degi';
-	        case 'dd':
-	            if (plural(number)) {
-	                if (withoutSuffix) {
-	                    return result + 'dagar';
+	            case 's':
+	                return withoutSuffix || isFuture ? 'nokkrar sekúndur' : 'nokkrum sekúndum';
+	            case 'm':
+	                return withoutSuffix ? 'mínúta' : 'mínútu';
+	            case 'mm':
+	                if (plural(number)) {
+	                    return result + (withoutSuffix || isFuture ? 'mínútur' : 'mínútum');
+	                } else if (withoutSuffix) {
+	                    return result + 'mínúta';
 	                }
-	                return result + (isFuture ? 'daga' : 'dögum');
-	            } else if (withoutSuffix) {
-	                return result + 'dagur';
-	            }
-	            return result + (isFuture ? 'dag' : 'degi');
-	        case 'M':
-	            if (withoutSuffix) {
-	                return 'mánuður';
-	            }
-	            return isFuture ? 'mánuð' : 'mánuði';
-	        case 'MM':
-	            if (plural(number)) {
-	                if (withoutSuffix) {
-	                    return result + 'mánuðir';
+	                return result + 'mínútu';
+	            case 'hh':
+	                if (plural(number)) {
+	                    return result + (withoutSuffix || isFuture ? 'klukkustundir' : 'klukkustundum');
 	                }
-	                return result + (isFuture ? 'mánuði' : 'mánuðum');
-	            } else if (withoutSuffix) {
-	                return result + 'mánuður';
-	            }
-	            return result + (isFuture ? 'mánuð' : 'mánuði');
-	        case 'y':
-	            return withoutSuffix || isFuture ? 'ár' : 'ári';
-	        case 'yy':
-	            if (plural(number)) {
-	                return result + (withoutSuffix || isFuture ? 'ár' : 'árum');
-	            }
-	            return result + (withoutSuffix || isFuture ? 'ár' : 'ári');
+	                return result + 'klukkustund';
+	            case 'd':
+	                if (withoutSuffix) {
+	                    return 'dagur';
+	                }
+	                return isFuture ? 'dag' : 'degi';
+	            case 'dd':
+	                if (plural(number)) {
+	                    if (withoutSuffix) {
+	                        return result + 'dagar';
+	                    }
+	                    return result + (isFuture ? 'daga' : 'dögum');
+	                } else if (withoutSuffix) {
+	                    return result + 'dagur';
+	                }
+	                return result + (isFuture ? 'dag' : 'degi');
+	            case 'M':
+	                if (withoutSuffix) {
+	                    return 'mánuður';
+	                }
+	                return isFuture ? 'mánuð' : 'mánuði';
+	            case 'MM':
+	                if (plural(number)) {
+	                    if (withoutSuffix) {
+	                        return result + 'mánuðir';
+	                    }
+	                    return result + (isFuture ? 'mánuði' : 'mánuðum');
+	                } else if (withoutSuffix) {
+	                    return result + 'mánuður';
+	                }
+	                return result + (isFuture ? 'mánuð' : 'mánuði');
+	            case 'y':
+	                return withoutSuffix || isFuture ? 'ár' : 'ári';
+	            case 'yy':
+	                if (plural(number)) {
+	                    return result + (withoutSuffix || isFuture ? 'ár' : 'árum');
+	                }
+	                return result + (withoutSuffix || isFuture ? 'ár' : 'ári');
 	        }
 	    }
 	
@@ -27717,17 +28674,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 127 */
+/* 130 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : italian (it)
+	//! locale : Italian [it]
 	//! author : Lorenzo : https://github.com/aliem
 	//! author: Mattia Larentis: https://github.com/nostalgiaz
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27791,16 +28748,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 128 */
+/* 131 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : japanese (ja)
+	//! locale : Japanese [ja]
 	//! author : LI Long : https://github.com/baryon
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27841,12 +28798,12 @@ var birchoutline =
 	        ordinalParse : /\d{1,2}日/,
 	        ordinal : function (number, period) {
 	            switch (period) {
-	            case 'd':
-	            case 'D':
-	            case 'DDD':
-	                return number + '日';
-	            default:
-	                return number;
+	                case 'd':
+	                case 'D':
+	                case 'DDD':
+	                    return number + '日';
+	                default:
+	                    return number;
 	            }
 	        },
 	        relativeTime : {
@@ -27871,17 +28828,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 129 */
+/* 132 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Boso Jowo (jv)
+	//! locale : Javanese [jv]
 	//! author : Rony Lantip : https://github.com/lantip
 	//! reference: http://jv.wikipedia.org/wiki/Basa_Jawa
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -27958,16 +28915,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 130 */
+/* 133 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Georgian (ka)
+	//! locale : Georgian [ka]
 	//! author : Irakli Janiashvili : https://github.com/irakli-janiashvili
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28051,16 +29008,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 131 */
+/* 134 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : kazakh (kk)
+	//! locale : Kazakh [kk]
 	//! authors : Nurlan Rakhimzhanov : https://github.com/nurlan
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28142,16 +29099,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 132 */
+/* 135 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : khmer (km)
+	//! locale : Cambodian [km]
 	//! author : Kruy Vanna : https://github.com/kruyvanna
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28204,20 +29161,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 133 */
+/* 136 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : korean (ko)
-	//!
-	//! authors
-	//!
-	//! - Kyungwook, Park : https://github.com/kyungw00k
-	//! - Jeeeyul Lee <jeeeyul@gmail.com>
+	//! locale : Korean [ko]
+	//! author : Kyungwook, Park : https://github.com/kyungw00k
+	//! author : Jeeeyul Lee <jeeeyul@gmail.com>
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28276,16 +29230,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 134 */
+/* 137 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : kyrgyz (ky)
+	//! locale : Kyrgyz [ky]
 	//! author : Chyngyz Arystan uulu : https://github.com/chyngyz
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28368,16 +29322,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 135 */
+/* 138 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Luxembourgish (lb)
-	//! author : mweimerskirch : https://github.com/mweimerskirch, David Raison : https://github.com/kwisatz
+	//! locale : Luxembourgish [lb]
+	//! author : mweimerskirch : https://github.com/mweimerskirch
+	//! author : David Raison : https://github.com/kwisatz
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28508,16 +29463,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 136 */
+/* 139 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : lao (lo)
+	//! locale : Lao [lo]
 	//! author : Ryan Hart : https://github.com/ryanhart2
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28582,16 +29537,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 137 */
+/* 140 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Lithuanian (lt)
+	//! locale : Lithuanian [lt]
 	//! author : Mindaugas Mozūras : https://github.com/mmozuras
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28641,7 +29596,8 @@ var birchoutline =
 	    var lt = moment.defineLocale('lt', {
 	        months : {
 	            format: 'sausio_vasario_kovo_balandžio_gegužės_birželio_liepos_rugpjūčio_rugsėjo_spalio_lapkričio_gruodžio'.split('_'),
-	            standalone: 'sausis_vasaris_kovas_balandis_gegužė_birželis_liepa_rugpjūtis_rugsėjis_spalis_lapkritis_gruodis'.split('_')
+	            standalone: 'sausis_vasaris_kovas_balandis_gegužė_birželis_liepa_rugpjūtis_rugsėjis_spalis_lapkritis_gruodis'.split('_'),
+	            isFormat: /D[oD]?(\[[^\[\]]*\]|\s)+MMMM?|MMMM?(\[[^\[\]]*\]|\s)+D[oD]?/
 	        },
 	        monthsShort : 'sau_vas_kov_bal_geg_bir_lie_rgp_rgs_spa_lap_grd'.split('_'),
 	        weekdays : {
@@ -28702,17 +29658,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 138 */
+/* 141 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : latvian (lv)
+	//! locale : Latvian [lv]
 	//! author : Kristaps Karlsons : https://github.com/skakri
 	//! author : Jānis Elmeris : https://github.com/JanisE
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28735,11 +29691,11 @@ var birchoutline =
 	    function format(forms, number, withoutSuffix) {
 	        if (withoutSuffix) {
 	            // E.g. "21 minūte", "3 minūtes".
-	            return number % 10 === 1 && number !== 11 ? forms[2] : forms[3];
+	            return number % 10 === 1 && number % 100 !== 11 ? forms[2] : forms[3];
 	        } else {
 	            // E.g. "21 minūtes" as in "pēc 21 minūtes".
 	            // E.g. "3 minūtēm" as in "pēc 3 minūtēm".
-	            return number % 10 === 1 && number !== 11 ? forms[0] : forms[1];
+	            return number % 10 === 1 && number % 100 !== 11 ? forms[0] : forms[1];
 	        }
 	    }
 	    function relativeTimeWithPlural(number, withoutSuffix, key) {
@@ -28803,16 +29759,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 139 */
+/* 142 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Montenegrin (me)
+	//! locale : Montenegrin [me]
 	//! author : Miodrag Nikač <miodrag@restartit.me> : https://github.com/miodragnikac
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28851,7 +29807,7 @@ var birchoutline =
 	        longDateFormat: {
 	            LT: 'H:mm',
 	            LTS : 'H:mm:ss',
-	            L: 'DD. MM. YYYY',
+	            L: 'DD.MM.YYYY',
 	            LL: 'D. MMMM YYYY',
 	            LLL: 'D. MMMM YYYY H:mm',
 	            LLLL: 'dddd, D. MMMM YYYY H:mm'
@@ -28862,17 +29818,17 @@ var birchoutline =
 	
 	            nextWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[u] [nedjelju] [u] LT';
-	                case 3:
-	                    return '[u] [srijedu] [u] LT';
-	                case 6:
-	                    return '[u] [subotu] [u] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[u] dddd [u] LT';
+	                    case 0:
+	                        return '[u] [nedjelju] [u] LT';
+	                    case 3:
+	                        return '[u] [srijedu] [u] LT';
+	                    case 6:
+	                        return '[u] [subotu] [u] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[u] dddd [u] LT';
 	                }
 	            },
 	            lastDay  : '[juče u] LT',
@@ -28918,16 +29874,84 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 140 */
+/* 143 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : macedonian (mk)
+	//! locale : Maori [mi]
+	//! author : John Corrigan <robbiecloset@gmail.com> : https://github.com/johnideal
+	
+	;(function (global, factory) {
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
+	   factory(global.moment)
+	}(this, function (moment) { 'use strict';
+	
+	
+	    var mi = moment.defineLocale('mi', {
+	        months: 'Kohi-tāte_Hui-tanguru_Poutū-te-rangi_Paenga-whāwhā_Haratua_Pipiri_Hōngoingoi_Here-turi-kōkā_Mahuru_Whiringa-ā-nuku_Whiringa-ā-rangi_Hakihea'.split('_'),
+	        monthsShort: 'Kohi_Hui_Pou_Pae_Hara_Pipi_Hōngoi_Here_Mahu_Whi-nu_Whi-ra_Haki'.split('_'),
+	        monthsRegex: /(?:['a-z\u0101\u014D\u016B]+\-?){1,3}/i,
+	        monthsStrictRegex: /(?:['a-z\u0101\u014D\u016B]+\-?){1,3}/i,
+	        monthsShortRegex: /(?:['a-z\u0101\u014D\u016B]+\-?){1,3}/i,
+	        monthsShortStrictRegex: /(?:['a-z\u0101\u014D\u016B]+\-?){1,2}/i,
+	        weekdays: 'Rātapu_Mane_Tūrei_Wenerei_Tāite_Paraire_Hātarei'.split('_'),
+	        weekdaysShort: 'Ta_Ma_Tū_We_Tāi_Pa_Hā'.split('_'),
+	        weekdaysMin: 'Ta_Ma_Tū_We_Tāi_Pa_Hā'.split('_'),
+	        longDateFormat: {
+	            LT: 'HH:mm',
+	            LTS: 'HH:mm:ss',
+	            L: 'DD/MM/YYYY',
+	            LL: 'D MMMM YYYY',
+	            LLL: 'D MMMM YYYY [i] HH:mm',
+	            LLLL: 'dddd, D MMMM YYYY [i] HH:mm'
+	        },
+	        calendar: {
+	            sameDay: '[i teie mahana, i] LT',
+	            nextDay: '[apopo i] LT',
+	            nextWeek: 'dddd [i] LT',
+	            lastDay: '[inanahi i] LT',
+	            lastWeek: 'dddd [whakamutunga i] LT',
+	            sameElse: 'L'
+	        },
+	        relativeTime: {
+	            future: 'i roto i %s',
+	            past: '%s i mua',
+	            s: 'te hēkona ruarua',
+	            m: 'he meneti',
+	            mm: '%d meneti',
+	            h: 'te haora',
+	            hh: '%d haora',
+	            d: 'he ra',
+	            dd: '%d ra',
+	            M: 'he marama',
+	            MM: '%d marama',
+	            y: 'he tau',
+	            yy: '%d tau'
+	        },
+	        ordinalParse: /\d{1,2}º/,
+	        ordinal: '%dº',
+	        week : {
+	            dow : 1, // Monday is the first day of the week.
+	            doy : 4  // The week that contains Jan 4th is the first week of the year.
+	        }
+	    });
+	
+	    return mi;
+	
+	}));
+
+/***/ },
+/* 144 */
+/***/ function(module, exports, __webpack_require__) {
+
+	//! moment.js locale configuration
+	//! locale : Macedonian [mk]
 	//! author : Borislav Mickov : https://github.com/B0k0
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -28953,15 +29977,15 @@ var birchoutline =
 	            lastDay : '[Вчера во] LT',
 	            lastWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                case 3:
-	                case 6:
-	                    return '[Изминатата] dddd [во] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[Изминатиот] dddd [во] LT';
+	                    case 0:
+	                    case 3:
+	                    case 6:
+	                        return '[Изминатата] dddd [во] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[Изминатиот] dddd [во] LT';
 	                }
 	            },
 	            sameElse : 'L'
@@ -29012,16 +30036,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 141 */
+/* 145 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : malayalam (ml)
+	//! locale : Malayalam [ml]
 	//! author : Floyd Pink : https://github.com/floydpink
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29097,17 +30121,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 142 */
+/* 146 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Marathi (mr)
+	//! locale : Marathi [mr]
 	//! author : Harshad Kale : https://github.com/kalehv
 	//! author : Vivek Athalye : https://github.com/vnathalye
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29260,16 +30284,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 143 */
+/* 147 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Bahasa Malaysia (ms-MY)
+	//! locale : Malay [ms]
 	//! author : Weldan Jamili : https://github.com/weldan
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29346,16 +30370,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 144 */
+/* 148 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Bahasa Malaysia (ms-MY)
+	//! locale : Malay [ms-my]
+	//! note : DEPRECATED, the correct one is [ms]
 	//! author : Weldan Jamili : https://github.com/weldan
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29432,16 +30457,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 145 */
+/* 149 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Burmese (my)
+	//! locale : Burmese [my]
 	//! author : Squar team, mysquar.com
+	//! author : David Rossellat : https://github.com/gholadr
+	//! author : Tin Aung Lin : https://github.com/thanyawzinmin
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29529,17 +30556,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 146 */
+/* 150 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : norwegian bokmål (nb)
+	//! locale : Norwegian Bokmål [nb]
 	//! authors : Espen Hovlandsdal : https://github.com/rexxars
 	//!           Sigurd Gartmann : https://github.com/sigurdga
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29596,16 +30623,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 147 */
+/* 151 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : nepali/nepalese
+	//! locale : Nepalese [ne]
 	//! author : suvash : https://github.com/suvash
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29723,22 +30750,26 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 148 */
+/* 152 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : dutch (nl)
-	//! author : Joris Röling : https://github.com/jjupiter
+	//! locale : Dutch [nl]
+	//! author : Joris Röling : https://github.com/jorisroling
+	//! author : Jacob Middag : https://github.com/middagj
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
 	
 	    var monthsShortWithDots = 'jan._feb._mrt._apr._mei_jun._jul._aug._sep._okt._nov._dec.'.split('_'),
 	        monthsShortWithoutDots = 'jan_feb_mrt_apr_mei_jun_jul_aug_sep_okt_nov_dec'.split('_');
+	
+	    var monthsParse = [/^jan/i, /^feb/i, /^maart|mrt.?$/i, /^apr/i, /^mei$/i, /^jun[i.]?$/i, /^jul[i.]?$/i, /^aug/i, /^sep/i, /^okt/i, /^nov/i, /^dec/i];
+	    var monthsRegex = /^(januari|februari|maart|april|mei|april|ju[nl]i|augustus|september|oktober|november|december|jan\.?|feb\.?|mrt\.?|apr\.?|ju[nl]\.?|aug\.?|sep\.?|okt\.?|nov\.?|dec\.?)/i;
 	
 	    var nl = moment.defineLocale('nl', {
 	        months : 'januari_februari_maart_april_mei_juni_juli_augustus_september_oktober_november_december'.split('_'),
@@ -29749,7 +30780,16 @@ var birchoutline =
 	                return monthsShortWithDots[m.month()];
 	            }
 	        },
-	        monthsParseExact : true,
+	
+	        monthsRegex: monthsRegex,
+	        monthsShortRegex: monthsRegex,
+	        monthsStrictRegex: /^(januari|februari|maart|mei|ju[nl]i|april|augustus|september|oktober|november|december)/i,
+	        monthsShortStrictRegex: /^(jan\.?|feb\.?|mrt\.?|apr\.?|mei|ju[nl]\.?|aug\.?|sep\.?|okt\.?|nov\.?|dec\.?)/i,
+	
+	        monthsParse : monthsParse,
+	        longMonthsParse : monthsParse,
+	        shortMonthsParse : monthsParse,
+	
 	        weekdays : 'zondag_maandag_dinsdag_woensdag_donderdag_vrijdag_zaterdag'.split('_'),
 	        weekdaysShort : 'zo._ma._di._wo._do._vr._za.'.split('_'),
 	        weekdaysMin : 'Zo_Ma_Di_Wo_Do_Vr_Za'.split('_'),
@@ -29800,16 +30840,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 149 */
+/* 153 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : norwegian nynorsk (nn)
+	//! locale : Nynorsk [nn]
 	//! author : https://github.com/mechuwind
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29864,16 +30904,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 150 */
+/* 154 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : punjabi india (pa-in)
+	//! locale : Punjabi (India) [pa-in]
 	//! author : Harpreet Singh : https://github.com/harpreetkhalsagtbit
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -29992,16 +31032,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 151 */
+/* 155 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : polish (pl)
+	//! locale : Polish [pl]
 	//! author : Rafal Hirsz : https://github.com/evoL
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30014,18 +31054,18 @@ var birchoutline =
 	    function translate(number, withoutSuffix, key) {
 	        var result = number + ' ';
 	        switch (key) {
-	        case 'm':
-	            return withoutSuffix ? 'minuta' : 'minutę';
-	        case 'mm':
-	            return result + (plural(number) ? 'minuty' : 'minut');
-	        case 'h':
-	            return withoutSuffix  ? 'godzina'  : 'godzinę';
-	        case 'hh':
-	            return result + (plural(number) ? 'godziny' : 'godzin');
-	        case 'MM':
-	            return result + (plural(number) ? 'miesiące' : 'miesięcy');
-	        case 'yy':
-	            return result + (plural(number) ? 'lata' : 'lat');
+	            case 'm':
+	                return withoutSuffix ? 'minuta' : 'minutę';
+	            case 'mm':
+	                return result + (plural(number) ? 'minuty' : 'minut');
+	            case 'h':
+	                return withoutSuffix  ? 'godzina'  : 'godzinę';
+	            case 'hh':
+	                return result + (plural(number) ? 'godziny' : 'godzin');
+	            case 'MM':
+	                return result + (plural(number) ? 'miesiące' : 'miesięcy');
+	            case 'yy':
+	                return result + (plural(number) ? 'lata' : 'lat');
 	        }
 	    }
 	
@@ -30061,14 +31101,14 @@ var birchoutline =
 	            lastDay: '[Wczoraj o] LT',
 	            lastWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[W zeszłą niedzielę o] LT';
-	                case 3:
-	                    return '[W zeszłą środę o] LT';
-	                case 6:
-	                    return '[W zeszłą sobotę o] LT';
-	                default:
-	                    return '[W zeszły] dddd [o] LT';
+	                    case 0:
+	                        return '[W zeszłą niedzielę o] LT';
+	                    case 3:
+	                        return '[W zeszłą środę o] LT';
+	                    case 6:
+	                        return '[W zeszłą sobotę o] LT';
+	                    default:
+	                        return '[W zeszły] dddd [o] LT';
 	                }
 	            },
 	            sameElse: 'L'
@@ -30101,16 +31141,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 152 */
+/* 156 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : portuguese (pt)
+	//! locale : Portuguese [pt]
 	//! author : Jefferson : https://github.com/jalex79
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30170,16 +31210,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 153 */
+/* 157 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : brazilian portuguese (pt-br)
+	//! locale : Portuguese (Brazil) [pt-br]
 	//! author : Caio Ribeiro Pereira : https://github.com/caio-ribeiro-pereira
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30235,17 +31275,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 154 */
+/* 158 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : romanian (ro)
+	//! locale : Romanian [ro]
 	//! author : Vlad Gurdiga : https://github.com/gurdiga
 	//! author : Valentin Agachi : https://github.com/avaly
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30314,18 +31354,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 155 */
+/* 159 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : russian (ru)
+	//! locale : Russian [ru]
 	//! author : Viktorminator : https://github.com/Viktorminator
 	//! Author : Menelion Elensúle : https://github.com/Oire
 	//! author : Коренберг Марк : https://github.com/socketpair
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30374,10 +31414,18 @@ var birchoutline =
 	        monthsParse : monthsParse,
 	        longMonthsParse : monthsParse,
 	        shortMonthsParse : monthsParse,
-	        monthsRegex: /^(сентябр[яь]|октябр[яь]|декабр[яь]|феврал[яь]|январ[яь]|апрел[яь]|августа?|ноябр[яь]|сент\.|февр\.|нояб\.|июнь|янв.|июль|дек.|авг.|апр.|марта|мар[.т]|окт.|июн[яь]|июл[яь]|ма[яй])/i,
-	        monthsShortRegex: /^(сентябр[яь]|октябр[яь]|декабр[яь]|феврал[яь]|январ[яь]|апрел[яь]|августа?|ноябр[яь]|сент\.|февр\.|нояб\.|июнь|янв.|июль|дек.|авг.|апр.|марта|мар[.т]|окт.|июн[яь]|июл[яь]|ма[яй])/i,
-	        monthsStrictRegex: /^(сентябр[яь]|октябр[яь]|декабр[яь]|феврал[яь]|январ[яь]|апрел[яь]|августа?|ноябр[яь]|марта?|июн[яь]|июл[яь]|ма[яй])/i,
-	        monthsShortStrictRegex: /^(нояб\.|февр\.|сент\.|июль|янв\.|июн[яь]|мар[.т]|авг\.|апр\.|окт\.|дек\.|ма[яй])/i,
+	
+	        // полные названия с падежами, по три буквы, для некоторых, по 4 буквы, сокращения с точкой и без точки
+	        monthsRegex: /^(январ[ья]|янв\.?|феврал[ья]|февр?\.?|марта?|мар\.?|апрел[ья]|апр\.?|ма[йя]|июн[ья]|июн\.?|июл[ья]|июл\.?|августа?|авг\.?|сентябр[ья]|сент?\.?|октябр[ья]|окт\.?|ноябр[ья]|нояб?\.?|декабр[ья]|дек\.?)/i,
+	
+	        // копия предыдущего
+	        monthsShortRegex: /^(январ[ья]|янв\.?|феврал[ья]|февр?\.?|марта?|мар\.?|апрел[ья]|апр\.?|ма[йя]|июн[ья]|июн\.?|июл[ья]|июл\.?|августа?|авг\.?|сентябр[ья]|сент?\.?|октябр[ья]|окт\.?|ноябр[ья]|нояб?\.?|декабр[ья]|дек\.?)/i,
+	
+	        // полные названия с падежами
+	        monthsStrictRegex: /^(январ[яь]|феврал[яь]|марта?|апрел[яь]|ма[яй]|июн[яь]|июл[яь]|августа?|сентябр[яь]|октябр[яь]|ноябр[яь]|декабр[яь])/i,
+	
+	        // Выражение, которое соотвествует только сокращённым формам
+	        monthsShortStrictRegex: /^(янв\.|февр?\.|мар[т.]|апр\.|ма[яй]|июн[ья.]|июл[ья.]|авг\.|сент?\.|окт\.|нояб?\.|дек\.)/i,
 	        longDateFormat : {
 	            LT : 'HH:mm',
 	            LTS : 'HH:mm:ss',
@@ -30393,16 +31441,16 @@ var birchoutline =
 	            nextWeek: function (now) {
 	                if (now.week() !== this.week()) {
 	                    switch (this.day()) {
-	                    case 0:
-	                        return '[В следующее] dddd [в] LT';
-	                    case 1:
-	                    case 2:
-	                    case 4:
-	                        return '[В следующий] dddd [в] LT';
-	                    case 3:
-	                    case 5:
-	                    case 6:
-	                        return '[В следующую] dddd [в] LT';
+	                        case 0:
+	                            return '[В следующее] dddd [в] LT';
+	                        case 1:
+	                        case 2:
+	                        case 4:
+	                            return '[В следующий] dddd [в] LT';
+	                        case 3:
+	                        case 5:
+	                        case 6:
+	                            return '[В следующую] dddd [в] LT';
 	                    }
 	                } else {
 	                    if (this.day() === 2) {
@@ -30415,16 +31463,16 @@ var birchoutline =
 	            lastWeek: function (now) {
 	                if (now.week() !== this.week()) {
 	                    switch (this.day()) {
-	                    case 0:
-	                        return '[В прошлое] dddd [в] LT';
-	                    case 1:
-	                    case 2:
-	                    case 4:
-	                        return '[В прошлый] dddd [в] LT';
-	                    case 3:
-	                    case 5:
-	                    case 6:
-	                        return '[В прошлую] dddd [в] LT';
+	                        case 0:
+	                            return '[В прошлое] dddd [в] LT';
+	                        case 1:
+	                        case 2:
+	                        case 4:
+	                            return '[В прошлый] dddd [в] LT';
+	                        case 3:
+	                        case 5:
+	                        case 6:
+	                            return '[В прошлую] dddd [в] LT';
 	                    }
 	                } else {
 	                    if (this.day() === 2) {
@@ -30469,17 +31517,17 @@ var birchoutline =
 	        ordinalParse: /\d{1,2}-(й|го|я)/,
 	        ordinal: function (number, period) {
 	            switch (period) {
-	            case 'M':
-	            case 'd':
-	            case 'DDD':
-	                return number + '-й';
-	            case 'D':
-	                return number + '-го';
-	            case 'w':
-	            case 'W':
-	                return number + '-я';
-	            default:
-	                return number;
+	                case 'M':
+	                case 'd':
+	                case 'DDD':
+	                    return number + '-й';
+	                case 'D':
+	                    return number + '-го';
+	                case 'w':
+	                case 'W':
+	                    return number + '-я';
+	                default:
+	                    return number;
 	            }
 	        },
 	        week : {
@@ -30493,16 +31541,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 156 */
+/* 160 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Northern Sami (se)
+	//! locale : Northern Sami [se]
 	//! authors : Bård Rolstad Henriksen : https://github.com/karamell
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30558,16 +31606,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 157 */
+/* 161 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Sinhalese (si)
+	//! locale : Sinhalese [si]
 	//! author : Sampath Sitinamaluwa : https://github.com/sampathsris
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30633,17 +31681,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 158 */
+/* 162 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : slovak (sk)
+	//! locale : Slovak [sk]
 	//! author : Martin Minka : https://github.com/k2s
 	//! based on work of petrbela : https://github.com/petrbela
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30656,53 +31704,53 @@ var birchoutline =
 	    function translate(number, withoutSuffix, key, isFuture) {
 	        var result = number + ' ';
 	        switch (key) {
-	        case 's':  // a few seconds / in a few seconds / a few seconds ago
-	            return (withoutSuffix || isFuture) ? 'pár sekúnd' : 'pár sekundami';
-	        case 'm':  // a minute / in a minute / a minute ago
-	            return withoutSuffix ? 'minúta' : (isFuture ? 'minútu' : 'minútou');
-	        case 'mm': // 9 minutes / in 9 minutes / 9 minutes ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'minúty' : 'minút');
-	            } else {
-	                return result + 'minútami';
-	            }
-	            break;
-	        case 'h':  // an hour / in an hour / an hour ago
-	            return withoutSuffix ? 'hodina' : (isFuture ? 'hodinu' : 'hodinou');
-	        case 'hh': // 9 hours / in 9 hours / 9 hours ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'hodiny' : 'hodín');
-	            } else {
-	                return result + 'hodinami';
-	            }
-	            break;
-	        case 'd':  // a day / in a day / a day ago
-	            return (withoutSuffix || isFuture) ? 'deň' : 'dňom';
-	        case 'dd': // 9 days / in 9 days / 9 days ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'dni' : 'dní');
-	            } else {
-	                return result + 'dňami';
-	            }
-	            break;
-	        case 'M':  // a month / in a month / a month ago
-	            return (withoutSuffix || isFuture) ? 'mesiac' : 'mesiacom';
-	        case 'MM': // 9 months / in 9 months / 9 months ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'mesiace' : 'mesiacov');
-	            } else {
-	                return result + 'mesiacmi';
-	            }
-	            break;
-	        case 'y':  // a year / in a year / a year ago
-	            return (withoutSuffix || isFuture) ? 'rok' : 'rokom';
-	        case 'yy': // 9 years / in 9 years / 9 years ago
-	            if (withoutSuffix || isFuture) {
-	                return result + (plural(number) ? 'roky' : 'rokov');
-	            } else {
-	                return result + 'rokmi';
-	            }
-	            break;
+	            case 's':  // a few seconds / in a few seconds / a few seconds ago
+	                return (withoutSuffix || isFuture) ? 'pár sekúnd' : 'pár sekundami';
+	            case 'm':  // a minute / in a minute / a minute ago
+	                return withoutSuffix ? 'minúta' : (isFuture ? 'minútu' : 'minútou');
+	            case 'mm': // 9 minutes / in 9 minutes / 9 minutes ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'minúty' : 'minút');
+	                } else {
+	                    return result + 'minútami';
+	                }
+	                break;
+	            case 'h':  // an hour / in an hour / an hour ago
+	                return withoutSuffix ? 'hodina' : (isFuture ? 'hodinu' : 'hodinou');
+	            case 'hh': // 9 hours / in 9 hours / 9 hours ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'hodiny' : 'hodín');
+	                } else {
+	                    return result + 'hodinami';
+	                }
+	                break;
+	            case 'd':  // a day / in a day / a day ago
+	                return (withoutSuffix || isFuture) ? 'deň' : 'dňom';
+	            case 'dd': // 9 days / in 9 days / 9 days ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'dni' : 'dní');
+	                } else {
+	                    return result + 'dňami';
+	                }
+	                break;
+	            case 'M':  // a month / in a month / a month ago
+	                return (withoutSuffix || isFuture) ? 'mesiac' : 'mesiacom';
+	            case 'MM': // 9 months / in 9 months / 9 months ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'mesiace' : 'mesiacov');
+	                } else {
+	                    return result + 'mesiacmi';
+	                }
+	                break;
+	            case 'y':  // a year / in a year / a year ago
+	                return (withoutSuffix || isFuture) ? 'rok' : 'rokom';
+	            case 'yy': // 9 years / in 9 years / 9 years ago
+	                if (withoutSuffix || isFuture) {
+	                    return result + (plural(number) ? 'roky' : 'rokov');
+	                } else {
+	                    return result + 'rokmi';
+	                }
+	                break;
 	        }
 	    }
 	
@@ -30725,36 +31773,36 @@ var birchoutline =
 	            nextDay: '[zajtra o] LT',
 	            nextWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[v nedeľu o] LT';
-	                case 1:
-	                case 2:
-	                    return '[v] dddd [o] LT';
-	                case 3:
-	                    return '[v stredu o] LT';
-	                case 4:
-	                    return '[vo štvrtok o] LT';
-	                case 5:
-	                    return '[v piatok o] LT';
-	                case 6:
-	                    return '[v sobotu o] LT';
+	                    case 0:
+	                        return '[v nedeľu o] LT';
+	                    case 1:
+	                    case 2:
+	                        return '[v] dddd [o] LT';
+	                    case 3:
+	                        return '[v stredu o] LT';
+	                    case 4:
+	                        return '[vo štvrtok o] LT';
+	                    case 5:
+	                        return '[v piatok o] LT';
+	                    case 6:
+	                        return '[v sobotu o] LT';
 	                }
 	            },
 	            lastDay: '[včera o] LT',
 	            lastWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[minulú nedeľu o] LT';
-	                case 1:
-	                case 2:
-	                    return '[minulý] dddd [o] LT';
-	                case 3:
-	                    return '[minulú stredu o] LT';
-	                case 4:
-	                case 5:
-	                    return '[minulý] dddd [o] LT';
-	                case 6:
-	                    return '[minulú sobotu o] LT';
+	                    case 0:
+	                        return '[minulú nedeľu o] LT';
+	                    case 1:
+	                    case 2:
+	                        return '[minulý] dddd [o] LT';
+	                    case 3:
+	                        return '[minulú stredu o] LT';
+	                    case 4:
+	                    case 5:
+	                        return '[minulý] dddd [o] LT';
+	                    case 6:
+	                        return '[minulú sobotu o] LT';
 	                }
 	            },
 	            sameElse: 'L'
@@ -30787,16 +31835,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 159 */
+/* 163 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : slovenian (sl)
+	//! locale : Slovenian [sl]
 	//! author : Robert Sedovšek : https://github.com/sedovsek
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -30804,71 +31852,71 @@ var birchoutline =
 	    function processRelativeTime(number, withoutSuffix, key, isFuture) {
 	        var result = number + ' ';
 	        switch (key) {
-	        case 's':
-	            return withoutSuffix || isFuture ? 'nekaj sekund' : 'nekaj sekundami';
-	        case 'm':
-	            return withoutSuffix ? 'ena minuta' : 'eno minuto';
-	        case 'mm':
-	            if (number === 1) {
-	                result += withoutSuffix ? 'minuta' : 'minuto';
-	            } else if (number === 2) {
-	                result += withoutSuffix || isFuture ? 'minuti' : 'minutama';
-	            } else if (number < 5) {
-	                result += withoutSuffix || isFuture ? 'minute' : 'minutami';
-	            } else {
-	                result += withoutSuffix || isFuture ? 'minut' : 'minutami';
-	            }
-	            return result;
-	        case 'h':
-	            return withoutSuffix ? 'ena ura' : 'eno uro';
-	        case 'hh':
-	            if (number === 1) {
-	                result += withoutSuffix ? 'ura' : 'uro';
-	            } else if (number === 2) {
-	                result += withoutSuffix || isFuture ? 'uri' : 'urama';
-	            } else if (number < 5) {
-	                result += withoutSuffix || isFuture ? 'ure' : 'urami';
-	            } else {
-	                result += withoutSuffix || isFuture ? 'ur' : 'urami';
-	            }
-	            return result;
-	        case 'd':
-	            return withoutSuffix || isFuture ? 'en dan' : 'enim dnem';
-	        case 'dd':
-	            if (number === 1) {
-	                result += withoutSuffix || isFuture ? 'dan' : 'dnem';
-	            } else if (number === 2) {
-	                result += withoutSuffix || isFuture ? 'dni' : 'dnevoma';
-	            } else {
-	                result += withoutSuffix || isFuture ? 'dni' : 'dnevi';
-	            }
-	            return result;
-	        case 'M':
-	            return withoutSuffix || isFuture ? 'en mesec' : 'enim mesecem';
-	        case 'MM':
-	            if (number === 1) {
-	                result += withoutSuffix || isFuture ? 'mesec' : 'mesecem';
-	            } else if (number === 2) {
-	                result += withoutSuffix || isFuture ? 'meseca' : 'mesecema';
-	            } else if (number < 5) {
-	                result += withoutSuffix || isFuture ? 'mesece' : 'meseci';
-	            } else {
-	                result += withoutSuffix || isFuture ? 'mesecev' : 'meseci';
-	            }
-	            return result;
-	        case 'y':
-	            return withoutSuffix || isFuture ? 'eno leto' : 'enim letom';
-	        case 'yy':
-	            if (number === 1) {
-	                result += withoutSuffix || isFuture ? 'leto' : 'letom';
-	            } else if (number === 2) {
-	                result += withoutSuffix || isFuture ? 'leti' : 'letoma';
-	            } else if (number < 5) {
-	                result += withoutSuffix || isFuture ? 'leta' : 'leti';
-	            } else {
-	                result += withoutSuffix || isFuture ? 'let' : 'leti';
-	            }
-	            return result;
+	            case 's':
+	                return withoutSuffix || isFuture ? 'nekaj sekund' : 'nekaj sekundami';
+	            case 'm':
+	                return withoutSuffix ? 'ena minuta' : 'eno minuto';
+	            case 'mm':
+	                if (number === 1) {
+	                    result += withoutSuffix ? 'minuta' : 'minuto';
+	                } else if (number === 2) {
+	                    result += withoutSuffix || isFuture ? 'minuti' : 'minutama';
+	                } else if (number < 5) {
+	                    result += withoutSuffix || isFuture ? 'minute' : 'minutami';
+	                } else {
+	                    result += withoutSuffix || isFuture ? 'minut' : 'minutami';
+	                }
+	                return result;
+	            case 'h':
+	                return withoutSuffix ? 'ena ura' : 'eno uro';
+	            case 'hh':
+	                if (number === 1) {
+	                    result += withoutSuffix ? 'ura' : 'uro';
+	                } else if (number === 2) {
+	                    result += withoutSuffix || isFuture ? 'uri' : 'urama';
+	                } else if (number < 5) {
+	                    result += withoutSuffix || isFuture ? 'ure' : 'urami';
+	                } else {
+	                    result += withoutSuffix || isFuture ? 'ur' : 'urami';
+	                }
+	                return result;
+	            case 'd':
+	                return withoutSuffix || isFuture ? 'en dan' : 'enim dnem';
+	            case 'dd':
+	                if (number === 1) {
+	                    result += withoutSuffix || isFuture ? 'dan' : 'dnem';
+	                } else if (number === 2) {
+	                    result += withoutSuffix || isFuture ? 'dni' : 'dnevoma';
+	                } else {
+	                    result += withoutSuffix || isFuture ? 'dni' : 'dnevi';
+	                }
+	                return result;
+	            case 'M':
+	                return withoutSuffix || isFuture ? 'en mesec' : 'enim mesecem';
+	            case 'MM':
+	                if (number === 1) {
+	                    result += withoutSuffix || isFuture ? 'mesec' : 'mesecem';
+	                } else if (number === 2) {
+	                    result += withoutSuffix || isFuture ? 'meseca' : 'mesecema';
+	                } else if (number < 5) {
+	                    result += withoutSuffix || isFuture ? 'mesece' : 'meseci';
+	                } else {
+	                    result += withoutSuffix || isFuture ? 'mesecev' : 'meseci';
+	                }
+	                return result;
+	            case 'y':
+	                return withoutSuffix || isFuture ? 'eno leto' : 'enim letom';
+	            case 'yy':
+	                if (number === 1) {
+	                    result += withoutSuffix || isFuture ? 'leto' : 'letom';
+	                } else if (number === 2) {
+	                    result += withoutSuffix || isFuture ? 'leti' : 'letoma';
+	                } else if (number < 5) {
+	                    result += withoutSuffix || isFuture ? 'leta' : 'leti';
+	                } else {
+	                    result += withoutSuffix || isFuture ? 'let' : 'leti';
+	                }
+	                return result;
 	        }
 	    }
 	
@@ -30883,7 +31931,7 @@ var birchoutline =
 	        longDateFormat : {
 	            LT : 'H:mm',
 	            LTS : 'H:mm:ss',
-	            L : 'DD. MM. YYYY',
+	            L : 'DD.MM.YYYY',
 	            LL : 'D. MMMM YYYY',
 	            LLL : 'D. MMMM YYYY H:mm',
 	            LLLL : 'dddd, D. MMMM YYYY H:mm'
@@ -30894,33 +31942,33 @@ var birchoutline =
 	
 	            nextWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[v] [nedeljo] [ob] LT';
-	                case 3:
-	                    return '[v] [sredo] [ob] LT';
-	                case 6:
-	                    return '[v] [soboto] [ob] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[v] dddd [ob] LT';
+	                    case 0:
+	                        return '[v] [nedeljo] [ob] LT';
+	                    case 3:
+	                        return '[v] [sredo] [ob] LT';
+	                    case 6:
+	                        return '[v] [soboto] [ob] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[v] dddd [ob] LT';
 	                }
 	            },
 	            lastDay  : '[včeraj ob] LT',
 	            lastWeek : function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[prejšnjo] [nedeljo] [ob] LT';
-	                case 3:
-	                    return '[prejšnjo] [sredo] [ob] LT';
-	                case 6:
-	                    return '[prejšnjo] [soboto] [ob] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[prejšnji] dddd [ob] LT';
+	                    case 0:
+	                        return '[prejšnjo] [nedeljo] [ob] LT';
+	                    case 3:
+	                        return '[prejšnjo] [sredo] [ob] LT';
+	                    case 6:
+	                        return '[prejšnjo] [soboto] [ob] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[prejšnji] dddd [ob] LT';
 	                }
 	            },
 	            sameElse : 'L'
@@ -30953,18 +32001,18 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 160 */
+/* 164 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Albanian (sq)
+	//! locale : Albanian [sq]
 	//! author : Flakërim Ismani : https://github.com/flakerimi
-	//! author: Menelion Elensúle: https://github.com/Oire (tests)
-	//! author : Oerd Cukalla : https://github.com/oerd (fixes)
+	//! author : Menelion Elensúle : https://github.com/Oire
+	//! author : Oerd Cukalla : https://github.com/oerd
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31027,16 +32075,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 161 */
+/* 165 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Serbian-latin (sr)
+	//! locale : Serbian [sr]
 	//! author : Milan Janačković<milanjanackovic@gmail.com> : https://github.com/milan-j
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31075,7 +32123,7 @@ var birchoutline =
 	        longDateFormat: {
 	            LT: 'H:mm',
 	            LTS : 'H:mm:ss',
-	            L: 'DD. MM. YYYY',
+	            L: 'DD.MM.YYYY',
 	            LL: 'D. MMMM YYYY',
 	            LLL: 'D. MMMM YYYY H:mm',
 	            LLLL: 'dddd, D. MMMM YYYY H:mm'
@@ -31085,17 +32133,17 @@ var birchoutline =
 	            nextDay: '[sutra u] LT',
 	            nextWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[u] [nedelju] [u] LT';
-	                case 3:
-	                    return '[u] [sredu] [u] LT';
-	                case 6:
-	                    return '[u] [subotu] [u] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[u] dddd [u] LT';
+	                    case 0:
+	                        return '[u] [nedelju] [u] LT';
+	                    case 3:
+	                        return '[u] [sredu] [u] LT';
+	                    case 6:
+	                        return '[u] [subotu] [u] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[u] dddd [u] LT';
 	                }
 	            },
 	            lastDay  : '[juče u] LT',
@@ -31141,16 +32189,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 162 */
+/* 166 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Serbian-cyrillic (sr-cyrl)
+	//! locale : Serbian Cyrillic [sr-cyrl]
 	//! author : Milan Janačković<milanjanackovic@gmail.com> : https://github.com/milan-j
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31189,7 +32237,7 @@ var birchoutline =
 	        longDateFormat: {
 	            LT: 'H:mm',
 	            LTS : 'H:mm:ss',
-	            L: 'DD. MM. YYYY',
+	            L: 'DD.MM.YYYY',
 	            LL: 'D. MMMM YYYY',
 	            LLL: 'D. MMMM YYYY H:mm',
 	            LLLL: 'dddd, D. MMMM YYYY H:mm'
@@ -31199,17 +32247,17 @@ var birchoutline =
 	            nextDay: '[сутра у] LT',
 	            nextWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                    return '[у] [недељу] [у] LT';
-	                case 3:
-	                    return '[у] [среду] [у] LT';
-	                case 6:
-	                    return '[у] [суботу] [у] LT';
-	                case 1:
-	                case 2:
-	                case 4:
-	                case 5:
-	                    return '[у] dddd [у] LT';
+	                    case 0:
+	                        return '[у] [недељу] [у] LT';
+	                    case 3:
+	                        return '[у] [среду] [у] LT';
+	                    case 6:
+	                        return '[у] [суботу] [у] LT';
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                    case 5:
+	                        return '[у] dddd [у] LT';
 	                }
 	            },
 	            lastDay  : '[јуче у] LT',
@@ -31255,16 +32303,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 163 */
+/* 167 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : siSwati (ss)
+	//! locale : siSwati [ss]
 	//! author : Nicolai Davies<mail@nicolai.io> : https://github.com/nicolaidavies
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31348,16 +32396,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 164 */
+/* 168 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : swedish (sv)
+	//! locale : Swedish [sv]
 	//! author : Jens Alm : https://github.com/ulmus
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31421,16 +32469,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 165 */
+/* 169 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : swahili (sw)
+	//! locale : Swahili [sw]
 	//! author : Fahad Kassim : https://github.com/fadsel
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31484,16 +32532,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 166 */
+/* 170 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : tamil (ta)
+	//! locale : Tamil [ta]
 	//! author : Arjunkumar Krishnamoorthy : https://github.com/tk120404
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31617,16 +32665,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 167 */
+/* 171 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : telugu (te)
+	//! locale : Telugu [te]
 	//! author : Krishna Chaitanya Thota : https://github.com/kcthota
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31710,35 +32758,35 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 168 */
+/* 172 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : thai (th)
+	//! locale : Thai [th]
 	//! author : Kridsada Thanabulpong : https://github.com/sirn
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
 	
 	    var th = moment.defineLocale('th', {
 	        months : 'มกราคม_กุมภาพันธ์_มีนาคม_เมษายน_พฤษภาคม_มิถุนายน_กรกฎาคม_สิงหาคม_กันยายน_ตุลาคม_พฤศจิกายน_ธันวาคม'.split('_'),
-	        monthsShort : 'มกรา_กุมภา_มีนา_เมษา_พฤษภา_มิถุนา_กรกฎา_สิงหา_กันยา_ตุลา_พฤศจิกา_ธันวา'.split('_'),
+	        monthsShort : 'ม.ค._ก.พ._มี.ค._เม.ย._พ.ค._มิ.ย._ก.ค._ส.ค._ก.ย._ต.ค._พ.ย._ธ.ค.'.split('_'),
 	        monthsParseExact: true,
 	        weekdays : 'อาทิตย์_จันทร์_อังคาร_พุธ_พฤหัสบดี_ศุกร์_เสาร์'.split('_'),
 	        weekdaysShort : 'อาทิตย์_จันทร์_อังคาร_พุธ_พฤหัส_ศุกร์_เสาร์'.split('_'), // yes, three characters difference
 	        weekdaysMin : 'อา._จ._อ._พ._พฤ._ศ._ส.'.split('_'),
 	        weekdaysParseExact : true,
 	        longDateFormat : {
-	            LT : 'H นาฬิกา m นาที',
-	            LTS : 'H นาฬิกา m นาที s วินาที',
+	            LT : 'H:mm',
+	            LTS : 'H:mm:ss',
 	            L : 'YYYY/MM/DD',
 	            LL : 'D MMMM YYYY',
-	            LLL : 'D MMMM YYYY เวลา H นาฬิกา m นาที',
-	            LLLL : 'วันddddที่ D MMMM YYYY เวลา H นาฬิกา m นาที'
+	            LLL : 'D MMMM YYYY เวลา H:mm',
+	            LLLL : 'วันddddที่ D MMMM YYYY เวลา H:mm'
 	        },
 	        meridiemParse: /ก่อนเที่ยง|หลังเที่ยง/,
 	        isPM: function (input) {
@@ -31781,16 +32829,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 169 */
+/* 173 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Tagalog/Filipino (tl-ph)
-	//! author : Dan Hagman
+	//! locale : Tagalog (Philippines) [tl-ph]
+	//! author : Dan Hagman : https://github.com/hagmandan
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31847,16 +32895,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 170 */
+/* 174 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Klingon (tlh)
+	//! locale : Klingon [tlh]
 	//! author : Dominika Kruk : https://github.com/amaranthrose
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -31866,24 +32914,24 @@ var birchoutline =
 	    function translateFuture(output) {
 	        var time = output;
 	        time = (output.indexOf('jaj') !== -1) ?
-	    	time.slice(0, -3) + 'leS' :
-	    	(output.indexOf('jar') !== -1) ?
-	    	time.slice(0, -3) + 'waQ' :
-	    	(output.indexOf('DIS') !== -1) ?
-	    	time.slice(0, -3) + 'nem' :
-	    	time + ' pIq';
+	        time.slice(0, -3) + 'leS' :
+	        (output.indexOf('jar') !== -1) ?
+	        time.slice(0, -3) + 'waQ' :
+	        (output.indexOf('DIS') !== -1) ?
+	        time.slice(0, -3) + 'nem' :
+	        time + ' pIq';
 	        return time;
 	    }
 	
 	    function translatePast(output) {
 	        var time = output;
 	        time = (output.indexOf('jaj') !== -1) ?
-	    	time.slice(0, -3) + 'Hu’' :
-	    	(output.indexOf('jar') !== -1) ?
-	    	time.slice(0, -3) + 'wen' :
-	    	(output.indexOf('DIS') !== -1) ?
-	    	time.slice(0, -3) + 'ben' :
-	    	time + ' ret';
+	        time.slice(0, -3) + 'Hu’' :
+	        (output.indexOf('jar') !== -1) ?
+	        time.slice(0, -3) + 'wen' :
+	        (output.indexOf('DIS') !== -1) ?
+	        time.slice(0, -3) + 'ben' :
+	        time + ' ret';
 	        return time;
 	    }
 	
@@ -31905,9 +32953,9 @@ var birchoutline =
 	
 	    function numberAsNoun(number) {
 	        var hundred = Math.floor((number % 1000) / 100),
-	    	ten = Math.floor((number % 100) / 10),
-	    	one = number % 10,
-	    	word = '';
+	        ten = Math.floor((number % 100) / 10),
+	        one = number % 10,
+	        word = '';
 	        if (hundred > 0) {
 	            word += numbersNouns[hundred] + 'vatlh';
 	        }
@@ -31971,17 +33019,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 171 */
+/* 175 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : turkish (tr)
+	//! locale : Turkish [tr]
 	//! authors : Erhan Gundogan : https://github.com/erhangundogan,
 	//!           Burak Yiğit Kaya: https://github.com/BYK
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32065,19 +33113,19 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 172 */
+/* 176 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : talossan (tzl)
-	//! author : Robin van der Vliet : https://github.com/robin0van0der0v with the help of Iustì Canun
+	//! locale : Talossan [tzl]
+	//! author : Robin van der Vliet : https://github.com/robin0van0der0v
+	//! author : Iustì Canun
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
-	
 	
 	
 	    // After the year there should be a slash and the amount of years since December 26, 1979 in Roman numerals.
@@ -32160,16 +33208,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 173 */
+/* 177 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Morocco Central Atlas Tamaziɣt (tzm)
+	//! locale : Central Atlas Tamazight [tzm]
 	//! author : Abdel Said : https://github.com/abdelsaid
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32222,16 +33270,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 174 */
+/* 178 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : Morocco Central Atlas Tamaziɣt in Latin (tzm-latn)
+	//! locale : Central Atlas Tamazight Latin [tzm-latn]
 	//! author : Abdel Said : https://github.com/abdelsaid
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32284,17 +33332,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 175 */
+/* 179 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : ukrainian (uk)
+	//! locale : Ukrainian [uk]
 	//! author : zemlanin : https://github.com/zemlanin
 	//! Author : Menelion Elensúle : https://github.com/Oire
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32364,15 +33412,15 @@ var birchoutline =
 	            nextWeek: processHoursFunction('[У] dddd ['),
 	            lastWeek: function () {
 	                switch (this.day()) {
-	                case 0:
-	                case 3:
-	                case 5:
-	                case 6:
-	                    return processHoursFunction('[Минулої] dddd [').call(this);
-	                case 1:
-	                case 2:
-	                case 4:
-	                    return processHoursFunction('[Минулого] dddd [').call(this);
+	                    case 0:
+	                    case 3:
+	                    case 5:
+	                    case 6:
+	                        return processHoursFunction('[Минулої] dddd [').call(this);
+	                    case 1:
+	                    case 2:
+	                    case 4:
+	                        return processHoursFunction('[Минулого] dddd [').call(this);
 	                }
 	            },
 	            sameElse: 'L'
@@ -32411,16 +33459,16 @@ var birchoutline =
 	        ordinalParse: /\d{1,2}-(й|го)/,
 	        ordinal: function (number, period) {
 	            switch (period) {
-	            case 'M':
-	            case 'd':
-	            case 'DDD':
-	            case 'w':
-	            case 'W':
-	                return number + '-й';
-	            case 'D':
-	                return number + '-го';
-	            default:
-	                return number;
+	                case 'M':
+	                case 'd':
+	                case 'DDD':
+	                case 'w':
+	                case 'W':
+	                    return number + '-й';
+	                case 'D':
+	                    return number + '-го';
+	                default:
+	                    return number;
 	            }
 	        },
 	        week : {
@@ -32434,16 +33482,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 176 */
+/* 180 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : uzbek (uz)
+	//! locale : Uzbek [uz]
 	//! author : Sardor Muminov : https://github.com/muminoff
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32496,16 +33544,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 177 */
+/* 181 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : vietnamese (vi)
+	//! locale : Vietnamese [vi]
 	//! author : Bang Nguyen : https://github.com/bangnk
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32579,16 +33627,16 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 178 */
+/* 182 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : pseudo (x-pseudo)
+	//! locale : Pseudo [x-pseudo]
 	//! author : Andrew Hood : https://github.com/andrewhood125
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32651,17 +33699,17 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 179 */
+/* 183 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : chinese (zh-cn)
+	//! locale : Chinese (China) [zh-cn]
 	//! author : suupic : https://github.com/suupic
 	//! author : Zeno Zeng : https://github.com/zenozeng
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
@@ -32742,17 +33790,17 @@ var birchoutline =
 	        ordinalParse: /\d{1,2}(日|月|周)/,
 	        ordinal : function (number, period) {
 	            switch (period) {
-	            case 'd':
-	            case 'D':
-	            case 'DDD':
-	                return number + '日';
-	            case 'M':
-	                return number + '月';
-	            case 'w':
-	            case 'W':
-	                return number + '周';
-	            default:
-	                return number;
+	                case 'd':
+	                case 'D':
+	                case 'DDD':
+	                    return number + '日';
+	                case 'M':
+	                    return number + '月';
+	                case 'w':
+	                case 'W':
+	                    return number + '周';
+	                default:
+	                    return number;
 	            }
 	        },
 	        relativeTime : {
@@ -32782,21 +33830,23 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 180 */
+/* 184 */
 /***/ function(module, exports, __webpack_require__) {
 
 	//! moment.js locale configuration
-	//! locale : traditional chinese (zh-tw)
+	//! locale : Chinese (Hong Kong) [zh-hk]
 	//! author : Ben : https://github.com/ben-lin
+	//! author : Chris Lam : https://github.com/hehachris
+	//! author : Konstantin : https://github.com/skfd
 	
 	;(function (global, factory) {
-	    true ? factory(__webpack_require__(78)) :
-	   typeof define === 'function' && define.amd ? define(['moment'], factory) :
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
 	   factory(global.moment)
 	}(this, function (moment) { 'use strict';
 	
 	
-	    var zh_tw = moment.defineLocale('zh-tw', {
+	    var zh_hk = moment.defineLocale('zh-hk', {
 	        months : '一月_二月_三月_四月_五月_六月_七月_八月_九月_十月_十一月_十二月'.split('_'),
 	        monthsShort : '1月_2月_3月_4月_5月_6月_7月_8月_9月_10月_11月_12月'.split('_'),
 	        weekdays : '星期日_星期一_星期二_星期三_星期四_星期五_星期六'.split('_'),
@@ -32814,12 +33864,12 @@ var birchoutline =
 	            lll : 'YYYY年MMMD日Ah點mm分',
 	            llll : 'YYYY年MMMD日ddddAh點mm分'
 	        },
-	        meridiemParse: /早上|上午|中午|下午|晚上/,
+	        meridiemParse: /凌晨|早上|上午|中午|下午|晚上/,
 	        meridiemHour : function (hour, meridiem) {
 	            if (hour === 12) {
 	                hour = 0;
 	            }
-	            if (meridiem === '早上' || meridiem === '上午') {
+	            if (meridiem === '凌晨' || meridiem === '早上' || meridiem === '上午') {
 	                return hour;
 	            } else if (meridiem === '中午') {
 	                return hour >= 11 ? hour : hour + 12;
@@ -32829,7 +33879,9 @@ var birchoutline =
 	        },
 	        meridiem : function (hour, minute, isLower) {
 	            var hm = hour * 100 + minute;
-	            if (hm < 900) {
+	            if (hm < 600) {
+	                return '凌晨';
+	            } else if (hm < 900) {
 	                return '早上';
 	            } else if (hm < 1130) {
 	                return '上午';
@@ -32852,33 +33904,141 @@ var birchoutline =
 	        ordinalParse: /\d{1,2}(日|月|週)/,
 	        ordinal : function (number, period) {
 	            switch (period) {
-	            case 'd' :
-	            case 'D' :
-	            case 'DDD' :
-	                return number + '日';
-	            case 'M' :
-	                return number + '月';
-	            case 'w' :
-	            case 'W' :
-	                return number + '週';
-	            default :
-	                return number;
+	                case 'd' :
+	                case 'D' :
+	                case 'DDD' :
+	                    return number + '日';
+	                case 'M' :
+	                    return number + '月';
+	                case 'w' :
+	                case 'W' :
+	                    return number + '週';
+	                default :
+	                    return number;
 	            }
 	        },
 	        relativeTime : {
 	            future : '%s內',
 	            past : '%s前',
 	            s : '幾秒',
-	            m : '1分鐘',
-	            mm : '%d分鐘',
-	            h : '1小時',
-	            hh : '%d小時',
-	            d : '1天',
-	            dd : '%d天',
-	            M : '1個月',
-	            MM : '%d個月',
-	            y : '1年',
-	            yy : '%d年'
+	            m : '1 分鐘',
+	            mm : '%d 分鐘',
+	            h : '1 小時',
+	            hh : '%d 小時',
+	            d : '1 天',
+	            dd : '%d 天',
+	            M : '1 個月',
+	            MM : '%d 個月',
+	            y : '1 年',
+	            yy : '%d 年'
+	        }
+	    });
+	
+	    return zh_hk;
+	
+	}));
+
+/***/ },
+/* 185 */
+/***/ function(module, exports, __webpack_require__) {
+
+	//! moment.js locale configuration
+	//! locale : Chinese (Taiwan) [zh-tw]
+	//! author : Ben : https://github.com/ben-lin
+	//! author : Chris Lam : https://github.com/hehachris
+	
+	;(function (global, factory) {
+	    true ? factory(__webpack_require__(79)) :
+	   typeof define === 'function' && define.amd ? define(['../moment'], factory) :
+	   factory(global.moment)
+	}(this, function (moment) { 'use strict';
+	
+	
+	    var zh_tw = moment.defineLocale('zh-tw', {
+	        months : '一月_二月_三月_四月_五月_六月_七月_八月_九月_十月_十一月_十二月'.split('_'),
+	        monthsShort : '1月_2月_3月_4月_5月_6月_7月_8月_9月_10月_11月_12月'.split('_'),
+	        weekdays : '星期日_星期一_星期二_星期三_星期四_星期五_星期六'.split('_'),
+	        weekdaysShort : '週日_週一_週二_週三_週四_週五_週六'.split('_'),
+	        weekdaysMin : '日_一_二_三_四_五_六'.split('_'),
+	        longDateFormat : {
+	            LT : 'Ah點mm分',
+	            LTS : 'Ah點m分s秒',
+	            L : 'YYYY年MMMD日',
+	            LL : 'YYYY年MMMD日',
+	            LLL : 'YYYY年MMMD日Ah點mm分',
+	            LLLL : 'YYYY年MMMD日ddddAh點mm分',
+	            l : 'YYYY年MMMD日',
+	            ll : 'YYYY年MMMD日',
+	            lll : 'YYYY年MMMD日Ah點mm分',
+	            llll : 'YYYY年MMMD日ddddAh點mm分'
+	        },
+	        meridiemParse: /凌晨|早上|上午|中午|下午|晚上/,
+	        meridiemHour : function (hour, meridiem) {
+	            if (hour === 12) {
+	                hour = 0;
+	            }
+	            if (meridiem === '凌晨' || meridiem === '早上' || meridiem === '上午') {
+	                return hour;
+	            } else if (meridiem === '中午') {
+	                return hour >= 11 ? hour : hour + 12;
+	            } else if (meridiem === '下午' || meridiem === '晚上') {
+	                return hour + 12;
+	            }
+	        },
+	        meridiem : function (hour, minute, isLower) {
+	            var hm = hour * 100 + minute;
+	            if (hm < 600) {
+	                return '凌晨';
+	            } else if (hm < 900) {
+	                return '早上';
+	            } else if (hm < 1130) {
+	                return '上午';
+	            } else if (hm < 1230) {
+	                return '中午';
+	            } else if (hm < 1800) {
+	                return '下午';
+	            } else {
+	                return '晚上';
+	            }
+	        },
+	        calendar : {
+	            sameDay : '[今天]LT',
+	            nextDay : '[明天]LT',
+	            nextWeek : '[下]ddddLT',
+	            lastDay : '[昨天]LT',
+	            lastWeek : '[上]ddddLT',
+	            sameElse : 'L'
+	        },
+	        ordinalParse: /\d{1,2}(日|月|週)/,
+	        ordinal : function (number, period) {
+	            switch (period) {
+	                case 'd' :
+	                case 'D' :
+	                case 'DDD' :
+	                    return number + '日';
+	                case 'M' :
+	                    return number + '月';
+	                case 'w' :
+	                case 'W' :
+	                    return number + '週';
+	                default :
+	                    return number;
+	            }
+	        },
+	        relativeTime : {
+	            future : '%s內',
+	            past : '%s前',
+	            s : '幾秒',
+	            m : '1 分鐘',
+	            mm : '%d 分鐘',
+	            h : '1 小時',
+	            hh : '%d 小時',
+	            d : '1 天',
+	            dd : '%d 天',
+	            M : '1 個月',
+	            MM : '%d 個月',
+	            y : '1 年',
+	            yy : '%d 年'
 	        }
 	    });
 	
@@ -32887,20 +34047,22 @@ var birchoutline =
 	}));
 
 /***/ },
-/* 181 */
+/* 186 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var DateTime, ItemPath, ItemPathParser, _;
+	var DateTime, Item, ItemPath, ItemPathParser, _;
 	
-	ItemPathParser = __webpack_require__(182);
+	ItemPathParser = __webpack_require__(187);
 	
-	DateTime = __webpack_require__(76);
+	DateTime = __webpack_require__(77);
 	
 	_ = __webpack_require__(14);
 	
+	Item = __webpack_require__(75);
+	
 	module.exports = ItemPath = (function() {
 	  ItemPath.parse = function(path, startRule, types) {
-	    var e, error1, exception, keywords, parsedPath;
+	    var e, exception, keywords, parsedPath;
 	    if (startRule == null) {
 	      startRule = 'ItemPathExpression';
 	    }
@@ -32950,6 +34112,7 @@ var birchoutline =
 	    if (this.options == null) {
 	      this.options = {};
 	    }
+	    this.itemToRowMap = new Map;
 	    parsed = this.constructor.parse(this.pathExpressionString, void 0, this.options.types);
 	    this.pathExpressionAST = parsed.parsedPath;
 	    this.pathExpressionKeywords = parsed.keywords;
@@ -32962,12 +34125,16 @@ var birchoutline =
 	   */
 	
 	  ItemPath.prototype.evaluate = function(item) {
+	    var result;
 	    this.now = new Date;
+	    this.itemToRowMap.clear();
 	    if (this.pathExpressionAST) {
-	      return this.evaluatePathExpression(this.pathExpressionAST, item);
+	      result = this.evaluatePathExpression(this.pathExpressionAST, item);
 	    } else {
-	      return [];
+	      result = [];
 	    }
+	    this.itemToRowMap.clear();
+	    return result;
 	  };
 	
 	  ItemPath.prototype.evaluatePathExpression = function(pathExpressionAST, item) {
@@ -32987,6 +34154,22 @@ var birchoutline =
 	    }
 	    this.sliceResultsFrom(pathExpressionAST.slice, results, 0);
 	    return results;
+	  };
+	
+	  ItemPath.prototype.rowForItem = function(item) {
+	    var each, root, row;
+	    if (this.itemToRowMap.size === 0) {
+	      root = item.outline.root;
+	      this.itemToRowMap.set(root.id, -1);
+	      each = root.firstChild;
+	      row = 0;
+	      while (each) {
+	        this.itemToRowMap.set(each.id, row);
+	        each = each.nextItem;
+	        row++;
+	      }
+	    }
+	    return this.itemToRowMap.get(item.id);
 	  };
 	
 	  ItemPath.prototype.unionOutlineOrderedResults = function(results1, results2, outline) {
@@ -33020,7 +34203,7 @@ var birchoutline =
 	        i++;
 	        j++;
 	      } else {
-	        if (r1.row < r2.row) {
+	        if (this.rowForItem(r1) < this.rowForItem(r2)) {
 	          results.push(r1);
 	          i++;
 	        } else {
@@ -33057,7 +34240,7 @@ var birchoutline =
 	        i++;
 	        j++;
 	      } else {
-	        if (r1.row < r2.row) {
+	        if (this.rowForItem(r1) < this.rowForItem(r2)) {
 	          i++;
 	        } else {
 	          j++;
@@ -33067,7 +34250,7 @@ var birchoutline =
 	  };
 	
 	  ItemPath.prototype.evaluateExcept = function(pathsAST, item) {
-	    var each, i, j, k, len, r1, r1Index, r2, r2Index, ref, results, results1, results2;
+	    var each, i, j, k, len, r1, r1Index, r1Row, r2, r2Index, ref, results, results1, results2;
 	    results1 = this.evaluatePathExpression(pathsAST[0], item);
 	    results2 = this.evaluatePathExpression(pathsAST[1], item);
 	    results = [];
@@ -33076,9 +34259,12 @@ var birchoutline =
 	    while (true) {
 	      r1 = results1[i];
 	      r2 = results2[j];
-	      while (r1 && r2 && (r1.row > r2.row)) {
-	        j++;
-	        r2 = results2[j];
+	      if (r1 && r2) {
+	        r1Row = this.rowForItem(r1);
+	        while (r2 && (r1Row > this.rowForItem(r2))) {
+	          j++;
+	          r2 = results2[j];
+	        }
 	      }
 	      if (!r1) {
 	        return results;
@@ -33303,7 +34489,7 @@ var birchoutline =
 	  };
 	
 	  ItemPath.prototype.evaluteGetAttributeFunction = function(attributePath, item) {
-	    var attributeName, ref;
+	    var attributeName, ref, value;
 	    attributeName = attributePath[1];
 	    attributeName = ((ref = this.options.attributeShortcuts) != null ? ref[attributeName] : void 0) || attributeName;
 	    switch (attributeName) {
@@ -33312,7 +34498,11 @@ var birchoutline =
 	      case 'text':
 	        return item.bodyString;
 	      default:
-	        return item.getAttribute('data-' + attributeName);
+	        if (value = item.getAttribute(attributeName)) {
+	          return value;
+	        } else {
+	          return item.getAttribute('data-' + attributeName);
+	        }
 	    }
 	  };
 	
@@ -33321,12 +34511,13 @@ var birchoutline =
 	  };
 	
 	  ItemPath.prototype.convertValueForModifier = function(value, modifier) {
+	    var ref;
 	    if (modifier === 'i') {
 	      return value.toLowerCase();
 	    } else if (modifier === 'n') {
 	      return parseFloat(value);
 	    } else if (modifier === 'd') {
-	      return DateTime.parse(value).getTime();
+	      return (ref = DateTime.parse(value)) != null ? ref.getTime() : void 0;
 	    } else if (modifier === 's') {
 	      return value;
 	    } else {
@@ -33335,7 +34526,7 @@ var birchoutline =
 	  };
 	
 	  ItemPath.prototype.evaluateRelation = function(left, relation, right, predicate) {
-	    var error, error1, joinedValueRegexCache;
+	    var error, joinedValueRegexCache;
 	    switch (relation) {
 	      case '=':
 	        return left === right;
@@ -33458,7 +34649,7 @@ var birchoutline =
 	   */
 	
 	  ItemPath.lastSegmentToItem = function(item) {
-	    var candidateSegment, candidateSegmentLower, e, each, error1, nextCandidateSegmentLength, targetBodyString;
+	    var candidateSegment, candidateSegmentLower, e, each, nextCandidateSegmentLength, targetBodyString;
 	    targetBodyString = item.bodyString.replace(/^\s+|\s+$/g, '');
 	    nextCandidateSegmentLength = Math.min(4, targetBodyString.length);
 	    while (nextCandidateSegmentLength <= targetBodyString.length) {
@@ -33552,7 +34743,7 @@ var birchoutline =
 	  };
 	
 	  ItemPath.prototype.valueToString = function(value) {
-	    var error, error1, functionName;
+	    var error, functionName;
 	    if (!value) {
 	      return;
 	    }
@@ -33645,949 +34836,734 @@ var birchoutline =
 
 
 /***/ },
-/* 182 */
+/* 187 */
 /***/ function(module, exports) {
 
-	module.exports = (function() {
-	  "use strict";
+	/*
+	 * Generated by PEG.js 0.10.0.
+	 *
+	 * http://pegjs.org/
+	 */
 	
-	  /*
-	   * Generated by PEG.js 0.9.0.
-	   *
-	   * http://pegjs.org/
-	   */
+	"use strict";
 	
-	  function peg$subclass(child, parent) {
-	    function ctor() { this.constructor = child; }
-	    ctor.prototype = parent.prototype;
-	    child.prototype = new ctor();
+	function peg$subclass(child, parent) {
+	  function ctor() { this.constructor = child; }
+	  ctor.prototype = parent.prototype;
+	  child.prototype = new ctor();
+	}
+	
+	function peg$SyntaxError(message, expected, found, location) {
+	  this.message  = message;
+	  this.expected = expected;
+	  this.found    = found;
+	  this.location = location;
+	  this.name     = "SyntaxError";
+	
+	  if (typeof Error.captureStackTrace === "function") {
+	    Error.captureStackTrace(this, peg$SyntaxError);
 	  }
+	}
 	
-	  function peg$SyntaxError(message, expected, found, location) {
-	    this.message  = message;
-	    this.expected = expected;
-	    this.found    = found;
-	    this.location = location;
-	    this.name     = "SyntaxError";
+	peg$subclass(peg$SyntaxError, Error);
 	
-	    if (typeof Error.captureStackTrace === "function") {
-	      Error.captureStackTrace(this, peg$SyntaxError);
-	    }
-	  }
+	peg$SyntaxError.buildMessage = function(expected, found) {
+	  var DESCRIBE_EXPECTATION_FNS = {
+	        literal: function(expectation) {
+	          return "\"" + literalEscape(expectation.text) + "\"";
+	        },
 	
-	  peg$subclass(peg$SyntaxError, Error);
+	        "class": function(expectation) {
+	          var escapedParts = "",
+	              i;
 	
-	  function peg$parse(input) {
-	    var options = arguments.length > 1 ? arguments[1] : {},
-	        parser  = this,
-	
-	        peg$FAILED = {},
-	
-	        peg$startRuleFunctions = { ItemPathExpression: peg$parseItemPathExpression, StringValue: peg$parseStringValue },
-	        peg$startRuleFunction  = peg$parseItemPathExpression,
-	
-	        peg$c0 = function(paths) {
-	            paths.keywords = keywords;
-	            return paths;
-	          },
-	        peg$c1 = function(left, right) { return combine(left, right, 'union') },
-	        peg$c2 = "union",
-	        peg$c3 = { type: "literal", value: "union", description: "\"union\"" },
-	        peg$c4 = function(union) {
-	            keyword('keyword.set');
-	            return union;
-	          },
-	        peg$c5 = function(left, right) { return combine(left, right, 'except') },
-	        peg$c6 = "except",
-	        peg$c7 = { type: "literal", value: "except", description: "\"except\"" },
-	        peg$c8 = function(except) {
-	            keyword('keyword.set');
-	            return except;
-	          },
-	        peg$c9 = function(left, right) { return combine(left, right, 'intersect') },
-	        peg$c10 = "intersect",
-	        peg$c11 = { type: "literal", value: "intersect", description: "\"intersect\"" },
-	        peg$c12 = function(intersect) {
-	            keyword('keyword.set');
-	            return intersect;
-	          },
-	        peg$c13 = "[",
-	        peg$c14 = { type: "literal", value: "[", description: "\"[\"" },
-	        peg$c15 = "]",
-	        peg$c16 = { type: "literal", value: "]", description: "\"]\"" },
-	        peg$c17 = function(start, end) {
-	            return {
-	              start: start === null ? 0 : start,
-	              end: end
-	            }
-	          },
-	        peg$c18 = ":",
-	        peg$c19 = { type: "literal", value: ":", description: "\":\"" },
-	        peg$c20 = function(integer) {
-	            if (integer !== null) {
-	              return integer;
-	            }
-	            return Number.MAX_VALUE;
-	          },
-	        peg$c21 = "-",
-	        peg$c22 = { type: "literal", value: "-", description: "\"-\"" },
-	        peg$c23 = /^[0-9]/,
-	        peg$c24 = { type: "class", value: "[0-9]", description: "[0-9]" },
-	        peg$c25 = function(sign, number) {
-	            if (sign) {
-	              return -parseInt(number.join(''), 10);
-	            } else {
-	              return parseInt(number.join(''), 10);
-	            }
-	          },
-	        peg$c26 = "(",
-	        peg$c27 = { type: "literal", value: "(", description: "\"(\"" },
-	        peg$c28 = ")",
-	        peg$c29 = { type: "literal", value: ")", description: "\")\"" },
-	        peg$c30 = function(expression, slice) {
-	            expression.slice = slice;
-	            return expression;
-	          },
-	        peg$c31 = "/",
-	        peg$c32 = { type: "literal", value: "/", description: "\"/\"" },
-	        peg$c33 = function(absolute, step, trailingSteps) {
-	            absolute = !! absolute;
-	
-	            if (absolute) {
-	              keyword('entity.other.axis', '/');
-	            } else if (step.defaultAxis) {
-	              // Default to descendent axis for first step in non absolute paths.
-	              step.axis = 'descendant';
-	            }
-	
-	            var steps = [step];
-	            if (trailingSteps) {
-	               steps = steps.concat(trailingSteps);
-	            }
-	            return {
-	              absolute : absolute,
-	              steps : steps
-	            }
-	          },
-	        peg$c34 = function(axis, type, predicate, slice) {
-	            return type || predicate;
-	          },
-	        peg$c35 = function(axis, type, predicate, slice) {
-	            var defaultAxis = false
-	            if (!axis) {
-	              defaultAxis = true
-	              axis = 'child';
-	            }
-	
-	            if (!type) {
-	              type = '*';
-	            }
-	
-	            if (!predicate) {
-	              predicate = '*'
-	            }
-	
-	            return {
-	              defaultAxis: defaultAxis,
-	              axis: axis,
-	              type: type,
-	              predicate: predicate,
-	              slice: slice
-	            }
-	          },
-	        peg$c36 = "ancestor-or-self::",
-	        peg$c37 = { type: "literal", value: "ancestor-or-self::", description: "\"ancestor-or-self::\"" },
-	        peg$c38 = "ancestor::",
-	        peg$c39 = { type: "literal", value: "ancestor::", description: "\"ancestor::\"" },
-	        peg$c40 = "child::",
-	        peg$c41 = { type: "literal", value: "child::", description: "\"child::\"" },
-	        peg$c42 = "descendant-or-self::",
-	        peg$c43 = { type: "literal", value: "descendant-or-self::", description: "\"descendant-or-self::\"" },
-	        peg$c44 = "descendant::",
-	        peg$c45 = { type: "literal", value: "descendant::", description: "\"descendant::\"" },
-	        peg$c46 = "following-sibling::",
-	        peg$c47 = { type: "literal", value: "following-sibling::", description: "\"following-sibling::\"" },
-	        peg$c48 = "following::",
-	        peg$c49 = { type: "literal", value: "following::", description: "\"following::\"" },
-	        peg$c50 = "preceding-sibling::",
-	        peg$c51 = { type: "literal", value: "preceding-sibling::", description: "\"preceding-sibling::\"" },
-	        peg$c52 = "preceding::",
-	        peg$c53 = { type: "literal", value: "preceding::", description: "\"preceding::\"" },
-	        peg$c54 = "parent::",
-	        peg$c55 = { type: "literal", value: "parent::", description: "\"parent::\"" },
-	        peg$c56 = "self::",
-	        peg$c57 = { type: "literal", value: "self::", description: "\"self::\"" },
-	        peg$c58 = "//",
-	        peg$c59 = { type: "literal", value: "//", description: "\"//\"" },
-	        peg$c60 = "..",
-	        peg$c61 = { type: "literal", value: "..", description: "\"..\"" },
-	        peg$c62 = ".",
-	        peg$c63 = { type: "literal", value: ".", description: "\".\"" },
-	        peg$c64 = function(axis) {
-	              keyword('entity.other.axis');
-	
-	              switch(axis) {
-	              case '//':
-	                return 'descendant-or-self';
-	              case '/':
-	                return 'descendant';
-	              case '..':
-	                return 'parent';
-	              case '.':
-	                return 'child';
-	              default:
-	                return axis.substr(0, axis.length - 2);
-	              }
-	            },
-	        peg$c65 = function(name) {
-	            var types = options.types;
-	            return types && types[name];
-	          },
-	        peg$c66 = function(name) {
-	            keyword('entity.other.axis');
-	            return name;
-	          },
-	        peg$c67 = function(step) {
-	            keyword('entity.other.axis', '/');
-	            return step;
-	          },
-	        peg$c68 = function(left, right) { return combine(left, right, 'or') },
-	        peg$c69 = "or",
-	        peg$c70 = { type: "literal", value: "or", description: "\"or\"" },
-	        peg$c71 = function(or) {
-	            keyword('keyword.boolean');
-	            return or;
-	          },
-	        peg$c72 = function(left, right) { return combine(left, right, 'and') },
-	        peg$c73 = "and",
-	        peg$c74 = { type: "literal", value: "and", description: "\"and\"" },
-	        peg$c75 = function(and) {
-	            keyword('keyword.boolean');
-	            return and;
-	          },
-	        peg$c76 = function(not, expression) {
-	            if (not && (not.length % 2)) {
-	              return {
-	                not : expression
-	              };
-	            } else {
-	              return expression;
-	            }
-	          },
-	        peg$c77 = "not",
-	        peg$c78 = { type: "literal", value: "not", description: "\"not\"" },
-	        peg$c79 = function(not) {
-	            keyword('keyword.boolean');
-	            return not;
-	          },
-	        peg$c80 = function(expression) { return expression; },
-	        peg$c81 = "*",
-	        peg$c82 = { type: "literal", value: "*", description: "\"*\"" },
-	        peg$c83 = function(leftValue, relation, modifier, rightValue) {
-	            return leftValue != null || rightValue != null;
-	          },
-	        peg$c84 = function(leftValue, relation, modifier, rightValue) {
-	            if (!relation && !rightValue) {
-	              if (leftValue[0] == 'getAttribute') {
-	                return {
-	                  leftValue : leftValue,
-	                  relation : null,
-	                  modifier : 'i',
-	                  rightValue : null
-	                };
-	              } else {
-	                return {
-	                  leftValue : ['getAttribute', 'text'],
-	                  relation : relation || 'contains',
-	                  modifier : modifier || 'i',
-	                  rightValue : leftValue
-	                }
-	              }
-	            }
-	            return {
-	              leftValue : leftValue || ['getAttribute', 'text'],
-	              relation : relation || 'contains',
-	              modifier : modifier || 'i',
-	              rightValue : rightValue
-	            }
-	          },
-	        peg$c85 = "@",
-	        peg$c86 = { type: "literal", value: "@", description: "\"@\"" },
-	        peg$c87 = function(name, trailingSegments) {
-	            var getAttributeFunction = ['getAttribute', name];
-	            if (trailingSegments) {
-	              getAttributeFunction = getAttributeFunction.concat(trailingSegments);
-	            }
-	            keyword('entity.other.attribute-name');
-	
-	            return getAttributeFunction;
-	          },
-	        peg$c88 = function(functionName, itemPathExpression) {
-	            return [functionName, itemPathExpression];
-	          },
-	        peg$c89 = function(name) {
-	            return name;
-	          },
-	        peg$c90 = function(chars) {
-	            return chars.join('');
-	          },
-	        peg$c91 = function(char) { return char; },
-	        peg$c92 = "count",
-	        peg$c93 = { type: "literal", value: "count", description: "\"count\"" },
-	        peg$c94 = function(name) {
-	            keyword('entity.other.function-name');
-	            return name;
-	          },
-	        peg$c95 = "beginswith",
-	        peg$c96 = { type: "literal", value: "beginswith", description: "\"beginswith\"" },
-	        peg$c97 = "contains",
-	        peg$c98 = { type: "literal", value: "contains", description: "\"contains\"" },
-	        peg$c99 = "endswith",
-	        peg$c100 = { type: "literal", value: "endswith", description: "\"endswith\"" },
-	        peg$c101 = "like",
-	        peg$c102 = { type: "literal", value: "like", description: "\"like\"" },
-	        peg$c103 = "matches",
-	        peg$c104 = { type: "literal", value: "matches", description: "\"matches\"" },
-	        peg$c105 = "=",
-	        peg$c106 = { type: "literal", value: "=", description: "\"=\"" },
-	        peg$c107 = "!=",
-	        peg$c108 = { type: "literal", value: "!=", description: "\"!=\"" },
-	        peg$c109 = "<=",
-	        peg$c110 = { type: "literal", value: "<=", description: "\"<=\"" },
-	        peg$c111 = ">=",
-	        peg$c112 = { type: "literal", value: ">=", description: "\">=\"" },
-	        peg$c113 = "<",
-	        peg$c114 = { type: "literal", value: "<", description: "\"<\"" },
-	        peg$c115 = ">",
-	        peg$c116 = { type: "literal", value: ">", description: "\">\"" },
-	        peg$c117 = function(relation) {
-	            keyword('keyword.operator.relation');
-	            return relation;
-	          },
-	        peg$c118 = "s",
-	        peg$c119 = { type: "literal", value: "s", description: "\"s\"" },
-	        peg$c120 = "i",
-	        peg$c121 = { type: "literal", value: "i", description: "\"i\"" },
-	        peg$c122 = "n",
-	        peg$c123 = { type: "literal", value: "n", description: "\"n\"" },
-	        peg$c124 = "d",
-	        peg$c125 = { type: "literal", value: "d", description: "\"d\"" },
-	        peg$c126 = function(modifier) {
-	            keyword('keyword.operator.modifier');
-	            return modifier;
-	          },
-	        peg$c127 = function(strings) {
-	            var results = [];
-	            for (var i = 0; i < strings.length; i++) {
-	              results.push(strings[i].join(''));
-	            }
-	            return results.join('').trim();
-	          },
-	        peg$c128 = { type: "other", description: "string" },
-	        peg$c129 = "\"\"",
-	        peg$c130 = { type: "literal", value: "\"\"", description: "\"\\\"\\\"\"" },
-	        peg$c131 = function() { return ""; },
-	        peg$c132 = "\"",
-	        peg$c133 = { type: "literal", value: "\"", description: "\"\\\"\"" },
-	        peg$c134 = function(chars) {
-	            keyword('string.quoted');
-	            return chars;
-	          },
-	        peg$c135 = function(chars) { return chars.join(""); },
-	        peg$c136 = /^[^"\\\0-\x1F]/,
-	        peg$c137 = { type: "class", value: "[^\"\\\\\\0-\\x1F\\x7f]", description: "[^\"\\\\\\0-\\x1F\\x7f]" },
-	        peg$c138 = "\\\"",
-	        peg$c139 = { type: "literal", value: "\\\"", description: "\"\\\\\\\"\"" },
-	        peg$c140 = function() { return '"';  },
-	        peg$c141 = "\\\\",
-	        peg$c142 = { type: "literal", value: "\\\\", description: "\"\\\\\\\\\"" },
-	        peg$c143 = function() { return "\\"; },
-	        peg$c144 = "\\/",
-	        peg$c145 = { type: "literal", value: "\\/", description: "\"\\\\/\"" },
-	        peg$c146 = function() { return "/";  },
-	        peg$c147 = "\\b",
-	        peg$c148 = { type: "literal", value: "\\b", description: "\"\\\\b\"" },
-	        peg$c149 = function() { return "\b"; },
-	        peg$c150 = "\\f",
-	        peg$c151 = { type: "literal", value: "\\f", description: "\"\\\\f\"" },
-	        peg$c152 = function() { return "\f"; },
-	        peg$c153 = "\\n",
-	        peg$c154 = { type: "literal", value: "\\n", description: "\"\\\\n\"" },
-	        peg$c155 = function() { return "\n"; },
-	        peg$c156 = "\\r",
-	        peg$c157 = { type: "literal", value: "\\r", description: "\"\\\\r\"" },
-	        peg$c158 = function() { return "\r"; },
-	        peg$c159 = "\\t",
-	        peg$c160 = { type: "literal", value: "\\t", description: "\"\\\\t\"" },
-	        peg$c161 = function() { return "\t"; },
-	        peg$c162 = /^[~`!#$%\^&*-+={}|\\;',.?\-]/,
-	        peg$c163 = { type: "class", value: "[~`!#$%^&*-+=\\{\\}|\\\\;',.?-]", description: "[~`!#$%^&*-+=\\{\\}|\\\\;',.?-]" },
-	        peg$c164 = function(string) {
-	            return reservedWords[string];
-	          },
-	        peg$c165 = function(string) {
-	            keyword('string.unquoted');
-	            return string;
-	          },
-	        peg$c166 = /^[A-Z]/,
-	        peg$c167 = { type: "class", value: "[A-Z]", description: "[A-Z]" },
-	        peg$c168 = "_",
-	        peg$c169 = { type: "literal", value: "_", description: "\"_\"" },
-	        peg$c170 = /^[a-z]/,
-	        peg$c171 = { type: "class", value: "[a-z]", description: "[a-z]" },
-	        peg$c172 = /^[\xC0-\xD6]/,
-	        peg$c173 = { type: "class", value: "[\\u00C0-\\u00D6]", description: "[\\u00C0-\\u00D6]" },
-	        peg$c174 = /^[\xD8-\xF6]/,
-	        peg$c175 = { type: "class", value: "[\\u00D8-\\u00F6]", description: "[\\u00D8-\\u00F6]" },
-	        peg$c176 = /^[\xF8-\u02FF]/,
-	        peg$c177 = { type: "class", value: "[\\u00F8-\\u02FF]", description: "[\\u00F8-\\u02FF]" },
-	        peg$c178 = /^[\u0370-\u037D]/,
-	        peg$c179 = { type: "class", value: "[\\u0370-\\u037D]", description: "[\\u0370-\\u037D]" },
-	        peg$c180 = /^[\u037F-\u1FFF]/,
-	        peg$c181 = { type: "class", value: "[\\u037F-\\u1FFF]", description: "[\\u037F-\\u1FFF]" },
-	        peg$c182 = /^[\u200C-\u200D]/,
-	        peg$c183 = { type: "class", value: "[\\u200C-\\u200D]", description: "[\\u200C-\\u200D]" },
-	        peg$c184 = /^[\u2070-\u218F]/,
-	        peg$c185 = { type: "class", value: "[\\u2070-\\u218F]", description: "[\\u2070-\\u218F]" },
-	        peg$c186 = /^[\u2C00-\u2FEF]/,
-	        peg$c187 = { type: "class", value: "[\\u2C00-\\u2FEF]", description: "[\\u2C00-\\u2FEF]" },
-	        peg$c188 = /^[\u3001-\uD7FF]/,
-	        peg$c189 = { type: "class", value: "[\\u3001-\\uD7FF]", description: "[\\u3001-\\uD7FF]" },
-	        peg$c190 = /^[\uF900-\uFDCF]/,
-	        peg$c191 = { type: "class", value: "[\\uF900-\\uFDCF]", description: "[\\uF900-\\uFDCF]" },
-	        peg$c192 = /^[\uFDF0-\uFFFD]/,
-	        peg$c193 = { type: "class", value: "[\\uFDF0-\\uFFFD]", description: "[\\uFDF0-\\uFFFD]" },
-	        peg$c194 = /^[\xB7]/,
-	        peg$c195 = { type: "class", value: "[\\u00B7]", description: "[\\u00B7]" },
-	        peg$c196 = /^[\u0300-\u036F]/,
-	        peg$c197 = { type: "class", value: "[\\u0300-\\u036F]", description: "[\\u0300-\\u036F]" },
-	        peg$c198 = /^[\u203F-\u2040]/,
-	        peg$c199 = { type: "class", value: "[\\u203F-\\u2040]", description: "[\\u203F-\\u2040]" },
-	        peg$c200 = function(startchar, chars) {
-	            return startchar + chars.join('');
-	          },
-	        peg$c201 = { type: "other", description: "whitespace" },
-	        peg$c202 = function(whitespace) { return whitespace.join("") },
-	        peg$c203 = /^[ \t\n\r]/,
-	        peg$c204 = { type: "class", value: "[ \\t\\n\\r]", description: "[ \\t\\n\\r]" },
-	
-	        peg$currPos          = 0,
-	        peg$savedPos         = 0,
-	        peg$posDetailsCache  = [{ line: 1, column: 1, seenCR: false }],
-	        peg$maxFailPos       = 0,
-	        peg$maxFailExpected  = [],
-	        peg$silentFails      = 0,
-	
-	        peg$resultsCache = {},
-	
-	        peg$result;
-	
-	    if ("startRule" in options) {
-	      if (!(options.startRule in peg$startRuleFunctions)) {
-	        throw new Error("Can't start parsing from rule \"" + options.startRule + "\".");
-	      }
-	
-	      peg$startRuleFunction = peg$startRuleFunctions[options.startRule];
-	    }
-	
-	    function text() {
-	      return input.substring(peg$savedPos, peg$currPos);
-	    }
-	
-	    function location() {
-	      return peg$computeLocation(peg$savedPos, peg$currPos);
-	    }
-	
-	    function expected(description) {
-	      throw peg$buildException(
-	        null,
-	        [{ type: "other", description: description }],
-	        input.substring(peg$savedPos, peg$currPos),
-	        peg$computeLocation(peg$savedPos, peg$currPos)
-	      );
-	    }
-	
-	    function error(message) {
-	      throw peg$buildException(
-	        message,
-	        null,
-	        input.substring(peg$savedPos, peg$currPos),
-	        peg$computeLocation(peg$savedPos, peg$currPos)
-	      );
-	    }
-	
-	    function peg$computePosDetails(pos) {
-	      var details = peg$posDetailsCache[pos],
-	          p, ch;
-	
-	      if (details) {
-	        return details;
-	      } else {
-	        p = pos - 1;
-	        while (!peg$posDetailsCache[p]) {
-	          p--;
-	        }
-	
-	        details = peg$posDetailsCache[p];
-	        details = {
-	          line:   details.line,
-	          column: details.column,
-	          seenCR: details.seenCR
-	        };
-	
-	        while (p < pos) {
-	          ch = input.charAt(p);
-	          if (ch === "\n") {
-	            if (!details.seenCR) { details.line++; }
-	            details.column = 1;
-	            details.seenCR = false;
-	          } else if (ch === "\r" || ch === "\u2028" || ch === "\u2029") {
-	            details.line++;
-	            details.column = 1;
-	            details.seenCR = true;
-	          } else {
-	            details.column++;
-	            details.seenCR = false;
+	          for (i = 0; i < expectation.parts.length; i++) {
+	            escapedParts += expectation.parts[i] instanceof Array
+	              ? classEscape(expectation.parts[i][0]) + "-" + classEscape(expectation.parts[i][1])
+	              : classEscape(expectation.parts[i]);
 	          }
 	
-	          p++;
-	        }
-	
-	        peg$posDetailsCache[pos] = details;
-	        return details;
-	      }
-	    }
-	
-	    function peg$computeLocation(startPos, endPos) {
-	      var startPosDetails = peg$computePosDetails(startPos),
-	          endPosDetails   = peg$computePosDetails(endPos);
-	
-	      return {
-	        start: {
-	          offset: startPos,
-	          line:   startPosDetails.line,
-	          column: startPosDetails.column
+	          return "[" + (expectation.inverted ? "^" : "") + escapedParts + "]";
 	        },
-	        end: {
-	          offset: endPos,
-	          line:   endPosDetails.line,
-	          column: endPosDetails.column
+	
+	        any: function(expectation) {
+	          return "any character";
+	        },
+	
+	        end: function(expectation) {
+	          return "end of input";
+	        },
+	
+	        other: function(expectation) {
+	          return expectation.description;
 	        }
 	      };
+	
+	  function hex(ch) {
+	    return ch.charCodeAt(0).toString(16).toUpperCase();
+	  }
+	
+	  function literalEscape(s) {
+	    return s
+	      .replace(/\\/g, '\\\\')
+	      .replace(/"/g,  '\\"')
+	      .replace(/\0/g, '\\0')
+	      .replace(/\t/g, '\\t')
+	      .replace(/\n/g, '\\n')
+	      .replace(/\r/g, '\\r')
+	      .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+	      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
+	  }
+	
+	  function classEscape(s) {
+	    return s
+	      .replace(/\\/g, '\\\\')
+	      .replace(/\]/g, '\\]')
+	      .replace(/\^/g, '\\^')
+	      .replace(/-/g,  '\\-')
+	      .replace(/\0/g, '\\0')
+	      .replace(/\t/g, '\\t')
+	      .replace(/\n/g, '\\n')
+	      .replace(/\r/g, '\\r')
+	      .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+	      .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
+	  }
+	
+	  function describeExpectation(expectation) {
+	    return DESCRIBE_EXPECTATION_FNS[expectation.type](expectation);
+	  }
+	
+	  function describeExpected(expected) {
+	    var descriptions = new Array(expected.length),
+	        i, j;
+	
+	    for (i = 0; i < expected.length; i++) {
+	      descriptions[i] = describeExpectation(expected[i]);
 	    }
 	
-	    function peg$fail(expected) {
-	      if (peg$currPos < peg$maxFailPos) { return; }
+	    descriptions.sort();
 	
-	      if (peg$currPos > peg$maxFailPos) {
-	        peg$maxFailPos = peg$currPos;
-	        peg$maxFailExpected = [];
+	    if (descriptions.length > 0) {
+	      for (i = 1, j = 1; i < descriptions.length; i++) {
+	        if (descriptions[i - 1] !== descriptions[i]) {
+	          descriptions[j] = descriptions[i];
+	          j++;
+	        }
 	      }
-	
-	      peg$maxFailExpected.push(expected);
+	      descriptions.length = j;
 	    }
 	
-	    function peg$buildException(message, expected, found, location) {
-	      function cleanupExpected(expected) {
-	        var i = 1;
+	    switch (descriptions.length) {
+	      case 1:
+	        return descriptions[0];
 	
-	        expected.sort(function(a, b) {
-	          if (a.description < b.description) {
-	            return -1;
-	          } else if (a.description > b.description) {
-	            return 1;
-	          } else {
-	            return 0;
+	      case 2:
+	        return descriptions[0] + " or " + descriptions[1];
+	
+	      default:
+	        return descriptions.slice(0, -1).join(", ")
+	          + ", or "
+	          + descriptions[descriptions.length - 1];
+	    }
+	  }
+	
+	  function describeFound(found) {
+	    return found ? "\"" + literalEscape(found) + "\"" : "end of input";
+	  }
+	
+	  return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
+	};
+	
+	function peg$parse(input, options) {
+	  options = options !== void 0 ? options : {};
+	
+	  var peg$FAILED = {},
+	
+	      peg$startRuleFunctions = { ItemPathExpression: peg$parseItemPathExpression, StringValue: peg$parseStringValue },
+	      peg$startRuleFunction  = peg$parseItemPathExpression,
+	
+	      peg$c0 = function(paths) {
+	          paths.keywords = keywords;
+	          return paths;
+	        },
+	      peg$c1 = function(left, right) { return combine(left, right, 'union') },
+	      peg$c2 = "union",
+	      peg$c3 = peg$literalExpectation("union", false),
+	      peg$c4 = function(union) {
+	          keyword('keyword.set');
+	          return union;
+	        },
+	      peg$c5 = function(left, right) { return combine(left, right, 'except') },
+	      peg$c6 = "except",
+	      peg$c7 = peg$literalExpectation("except", false),
+	      peg$c8 = function(except) {
+	          keyword('keyword.set');
+	          return except;
+	        },
+	      peg$c9 = function(left, right) { return combine(left, right, 'intersect') },
+	      peg$c10 = "intersect",
+	      peg$c11 = peg$literalExpectation("intersect", false),
+	      peg$c12 = function(intersect) {
+	          keyword('keyword.set');
+	          return intersect;
+	        },
+	      peg$c13 = "[",
+	      peg$c14 = peg$literalExpectation("[", false),
+	      peg$c15 = "]",
+	      peg$c16 = peg$literalExpectation("]", false),
+	      peg$c17 = function(start, end) {
+	          return {
+	            start: start === null ? 0 : start,
+	            end: end
 	          }
-	        });
-	
-	        while (i < expected.length) {
-	          if (expected[i - 1] === expected[i]) {
-	            expected.splice(i, 1);
-	          } else {
-	            i++;
+	        },
+	      peg$c18 = ":",
+	      peg$c19 = peg$literalExpectation(":", false),
+	      peg$c20 = function(integer) {
+	          if (integer !== null) {
+	            return integer;
 	          }
-	        }
-	      }
+	          return Number.MAX_VALUE;
+	        },
+	      peg$c21 = "-",
+	      peg$c22 = peg$literalExpectation("-", false),
+	      peg$c23 = /^[0-9]/,
+	      peg$c24 = peg$classExpectation([["0", "9"]], false, false),
+	      peg$c25 = function(sign, number) {
+	          if (sign) {
+	            return -parseInt(number.join(''), 10);
+	          } else {
+	            return parseInt(number.join(''), 10);
+	          }
+	        },
+	      peg$c26 = "(",
+	      peg$c27 = peg$literalExpectation("(", false),
+	      peg$c28 = ")",
+	      peg$c29 = peg$literalExpectation(")", false),
+	      peg$c30 = function(expression, slice) {
+	          expression.slice = slice;
+	          return expression;
+	        },
+	      peg$c31 = "/",
+	      peg$c32 = peg$literalExpectation("/", false),
+	      peg$c33 = function(absolute, step, trailingSteps) {
+	          absolute = !! absolute;
 	
-	      function buildMessage(expected, found) {
-	        function stringEscape(s) {
-	          function hex(ch) { return ch.charCodeAt(0).toString(16).toUpperCase(); }
+	          if (absolute) {
+	            keyword('entity.other.axis', '/');
+	          } else if (step.defaultAxis) {
+	            // Default to descendent axis for first step in non absolute paths.
+	            step.axis = 'descendant';
+	          }
 	
-	          return s
-	            .replace(/\\/g,   '\\\\')
-	            .replace(/"/g,    '\\"')
-	            .replace(/\x08/g, '\\b')
-	            .replace(/\t/g,   '\\t')
-	            .replace(/\n/g,   '\\n')
-	            .replace(/\f/g,   '\\f')
-	            .replace(/\r/g,   '\\r')
-	            .replace(/[\x00-\x07\x0B\x0E\x0F]/g, function(ch) { return '\\x0' + hex(ch); })
-	            .replace(/[\x10-\x1F\x80-\xFF]/g,    function(ch) { return '\\x'  + hex(ch); })
-	            .replace(/[\u0100-\u0FFF]/g,         function(ch) { return '\\u0' + hex(ch); })
-	            .replace(/[\u1000-\uFFFF]/g,         function(ch) { return '\\u'  + hex(ch); });
-	        }
+	          var steps = [step];
+	          if (trailingSteps) {
+	             steps = steps.concat(trailingSteps);
+	          }
+	          return {
+	            absolute : absolute,
+	            steps : steps
+	          }
+	        },
+	      peg$c34 = function(axis, type, predicate, slice) {
+	          return type || predicate;
+	        },
+	      peg$c35 = function(axis, type, predicate, slice) {
+	          var defaultAxis = false
+	          if (!axis) {
+	            defaultAxis = true
+	            axis = 'child';
+	          }
 	
-	        var expectedDescs = new Array(expected.length),
-	            expectedDesc, foundDesc, i;
+	          if (!type) {
+	            type = '*';
+	          }
 	
-	        for (i = 0; i < expected.length; i++) {
-	          expectedDescs[i] = expected[i].description;
-	        }
+	          if (!predicate) {
+	            predicate = '*'
+	          }
 	
-	        expectedDesc = expected.length > 1
-	          ? expectedDescs.slice(0, -1).join(", ")
-	              + " or "
-	              + expectedDescs[expected.length - 1]
-	          : expectedDescs[0];
+	          return {
+	            defaultAxis: defaultAxis,
+	            axis: axis,
+	            type: type,
+	            predicate: predicate,
+	            slice: slice
+	          }
+	        },
+	      peg$c36 = "ancestor-or-self::",
+	      peg$c37 = peg$literalExpectation("ancestor-or-self::", false),
+	      peg$c38 = "ancestor::",
+	      peg$c39 = peg$literalExpectation("ancestor::", false),
+	      peg$c40 = "child::",
+	      peg$c41 = peg$literalExpectation("child::", false),
+	      peg$c42 = "descendant-or-self::",
+	      peg$c43 = peg$literalExpectation("descendant-or-self::", false),
+	      peg$c44 = "descendant::",
+	      peg$c45 = peg$literalExpectation("descendant::", false),
+	      peg$c46 = "following-sibling::",
+	      peg$c47 = peg$literalExpectation("following-sibling::", false),
+	      peg$c48 = "following::",
+	      peg$c49 = peg$literalExpectation("following::", false),
+	      peg$c50 = "preceding-sibling::",
+	      peg$c51 = peg$literalExpectation("preceding-sibling::", false),
+	      peg$c52 = "preceding::",
+	      peg$c53 = peg$literalExpectation("preceding::", false),
+	      peg$c54 = "parent::",
+	      peg$c55 = peg$literalExpectation("parent::", false),
+	      peg$c56 = "self::",
+	      peg$c57 = peg$literalExpectation("self::", false),
+	      peg$c58 = "//",
+	      peg$c59 = peg$literalExpectation("//", false),
+	      peg$c60 = "..",
+	      peg$c61 = peg$literalExpectation("..", false),
+	      peg$c62 = ".",
+	      peg$c63 = peg$literalExpectation(".", false),
+	      peg$c64 = function(axis) {
+	            keyword('entity.other.axis');
 	
-	        foundDesc = found ? "\"" + stringEscape(found) + "\"" : "end of input";
-	
-	        return "Expected " + expectedDesc + " but " + foundDesc + " found.";
-	      }
-	
-	      if (expected !== null) {
-	        cleanupExpected(expected);
-	      }
-	
-	      return new peg$SyntaxError(
-	        message !== null ? message : buildMessage(expected, found),
-	        expected,
-	        found,
-	        location
-	      );
-	    }
-	
-	    function peg$parseItemPathExpression() {
-	      var s0, s1, s2;
-	
-	      var key    = peg$currPos * 42 + 0,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parseUnionPaths();
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parse_();
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c0(s1);
-	          s0 = s1;
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseUnionPaths() {
-	      var s0, s1, s2, s3, s4, s5;
-	
-	      var key    = peg$currPos * 42 + 1,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parseExceptPaths();
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parse_();
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseUnionKeyword();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parse_();
-	            if (s4 !== peg$FAILED) {
-	              s5 = peg$parseUnionPaths();
-	              if (s5 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c1(s1, s5);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
+	            switch(axis) {
+	            case '//':
+	              return 'descendant-or-self';
+	            case '/':
+	              return 'descendant';
+	            case '..':
+	              return 'parent';
+	            case '.':
+	              return 'child';
+	            default:
+	              return axis.substr(0, axis.length - 2);
+	            }
+	          },
+	      peg$c65 = function(name) {
+	          var types = options.types;
+	          return types && types[name];
+	        },
+	      peg$c66 = function(name) {
+	          keyword('entity.other.axis');
+	          return name;
+	        },
+	      peg$c67 = function(step) {
+	          keyword('entity.other.axis', '/');
+	          return step;
+	        },
+	      peg$c68 = function(left, right) { return combine(left, right, 'or') },
+	      peg$c69 = "or",
+	      peg$c70 = peg$literalExpectation("or", false),
+	      peg$c71 = function(or) {
+	          keyword('keyword.boolean');
+	          return or;
+	        },
+	      peg$c72 = function(left, right) { return combine(left, right, 'and') },
+	      peg$c73 = "and",
+	      peg$c74 = peg$literalExpectation("and", false),
+	      peg$c75 = function(and) {
+	          keyword('keyword.boolean');
+	          return and;
+	        },
+	      peg$c76 = function(not, expression) {
+	          if (not && (not.length % 2)) {
+	            return {
+	              not : expression
+	            };
+	          } else {
+	            return expression;
+	          }
+	        },
+	      peg$c77 = "not",
+	      peg$c78 = peg$literalExpectation("not", false),
+	      peg$c79 = function(not) {
+	          keyword('keyword.boolean');
+	          return not;
+	        },
+	      peg$c80 = function(expression) { return expression; },
+	      peg$c81 = "*",
+	      peg$c82 = peg$literalExpectation("*", false),
+	      peg$c83 = function(leftValue, relation, modifier, rightValue) {
+	          return leftValue != null || rightValue != null;
+	        },
+	      peg$c84 = function(leftValue, relation, modifier, rightValue) {
+	          if (!relation && !rightValue) {
+	            if (leftValue[0] == 'getAttribute') {
+	              return {
+	                leftValue : leftValue,
+	                relation : null,
+	                modifier : 'i',
+	                rightValue : null
+	              };
+	            } else {
+	              return {
+	                leftValue : ['getAttribute', 'text'],
+	                relation : relation || 'contains',
+	                modifier : modifier || 'i',
+	                rightValue : leftValue
 	              }
-	            } else {
-	              peg$currPos = s0;
-	              s0 = peg$FAILED;
 	            }
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
 	          }
+	          return {
+	            leftValue : leftValue || ['getAttribute', 'text'],
+	            relation : relation || 'contains',
+	            modifier : modifier || 'i',
+	            rightValue : rightValue
+	          }
+	        },
+	      peg$c85 = "@",
+	      peg$c86 = peg$literalExpectation("@", false),
+	      peg$c87 = function(name, trailingSegments) {
+	          var getAttributeFunction = ['getAttribute', name];
+	          if (trailingSegments) {
+	            getAttributeFunction = getAttributeFunction.concat(trailingSegments);
+	          }
+	          keyword('entity.other.attribute-name');
+	
+	          return getAttributeFunction;
+	        },
+	      peg$c88 = function(functionName, itemPathExpression) {
+	          return [functionName, itemPathExpression];
+	        },
+	      peg$c89 = function(name) {
+	          return name;
+	        },
+	      peg$c90 = function(chars) {
+	          return chars.join('');
+	        },
+	      peg$c91 = function(char) { return char; },
+	      peg$c92 = "count",
+	      peg$c93 = peg$literalExpectation("count", false),
+	      peg$c94 = function(name) {
+	          keyword('entity.other.function-name');
+	          return name;
+	        },
+	      peg$c95 = "beginswith",
+	      peg$c96 = peg$literalExpectation("beginswith", false),
+	      peg$c97 = "contains",
+	      peg$c98 = peg$literalExpectation("contains", false),
+	      peg$c99 = "endswith",
+	      peg$c100 = peg$literalExpectation("endswith", false),
+	      peg$c101 = "like",
+	      peg$c102 = peg$literalExpectation("like", false),
+	      peg$c103 = "matches",
+	      peg$c104 = peg$literalExpectation("matches", false),
+	      peg$c105 = "=",
+	      peg$c106 = peg$literalExpectation("=", false),
+	      peg$c107 = "!=",
+	      peg$c108 = peg$literalExpectation("!=", false),
+	      peg$c109 = "<=",
+	      peg$c110 = peg$literalExpectation("<=", false),
+	      peg$c111 = ">=",
+	      peg$c112 = peg$literalExpectation(">=", false),
+	      peg$c113 = "<",
+	      peg$c114 = peg$literalExpectation("<", false),
+	      peg$c115 = ">",
+	      peg$c116 = peg$literalExpectation(">", false),
+	      peg$c117 = function(relation) {
+	          keyword('keyword.operator.relation');
+	          return relation;
+	        },
+	      peg$c118 = "s",
+	      peg$c119 = peg$literalExpectation("s", false),
+	      peg$c120 = "i",
+	      peg$c121 = peg$literalExpectation("i", false),
+	      peg$c122 = "n",
+	      peg$c123 = peg$literalExpectation("n", false),
+	      peg$c124 = "d",
+	      peg$c125 = peg$literalExpectation("d", false),
+	      peg$c126 = function(modifier) {
+	          keyword('keyword.operator.modifier');
+	          return modifier;
+	        },
+	      peg$c127 = function(strings) {
+	          var results = [];
+	          for (var i = 0; i < strings.length; i++) {
+	            results.push(strings[i].join(''));
+	          }
+	          return results.join('').trim();
+	        },
+	      peg$c128 = peg$otherExpectation("string"),
+	      peg$c129 = "\"\"",
+	      peg$c130 = peg$literalExpectation("\"\"", false),
+	      peg$c131 = function() { return ""; },
+	      peg$c132 = "\"",
+	      peg$c133 = peg$literalExpectation("\"", false),
+	      peg$c134 = function(chars) {
+	          keyword('string.quoted');
+	          return chars;
+	        },
+	      peg$c135 = function(chars) { return chars.join(""); },
+	      peg$c136 = /^[^"\\\0-\x1F\x7F]/,
+	      peg$c137 = peg$classExpectation(["\"", "\\", ["\0", "\x1F"], "\x7F"], true, false),
+	      peg$c138 = "\\\"",
+	      peg$c139 = peg$literalExpectation("\\\"", false),
+	      peg$c140 = function() { return '"';  },
+	      peg$c141 = "\\\\",
+	      peg$c142 = peg$literalExpectation("\\\\", false),
+	      peg$c143 = function() { return "\\"; },
+	      peg$c144 = "\\/",
+	      peg$c145 = peg$literalExpectation("\\/", false),
+	      peg$c146 = function() { return "/";  },
+	      peg$c147 = "\\b",
+	      peg$c148 = peg$literalExpectation("\\b", false),
+	      peg$c149 = function() { return "\b"; },
+	      peg$c150 = "\\f",
+	      peg$c151 = peg$literalExpectation("\\f", false),
+	      peg$c152 = function() { return "\f"; },
+	      peg$c153 = "\\n",
+	      peg$c154 = peg$literalExpectation("\\n", false),
+	      peg$c155 = function() { return "\n"; },
+	      peg$c156 = "\\r",
+	      peg$c157 = peg$literalExpectation("\\r", false),
+	      peg$c158 = function() { return "\r"; },
+	      peg$c159 = "\\t",
+	      peg$c160 = peg$literalExpectation("\\t", false),
+	      peg$c161 = function() { return "\t"; },
+	      peg$c162 = /^[~`!#$%\^&*-+={}|\\;',.?\-]/,
+	      peg$c163 = peg$classExpectation(["~", "`", "!", "#", "$", "%", "^", "&", ["*", "+"], "=", "{", "}", "|", "\\", ";", "'", ",", ".", "?", "-"], false, false),
+	      peg$c164 = function(string) {
+	          return reservedWords[string];
+	        },
+	      peg$c165 = function(string) {
+	          keyword('string.unquoted');
+	          return string;
+	        },
+	      peg$c166 = /^[A-Z]/,
+	      peg$c167 = peg$classExpectation([["A", "Z"]], false, false),
+	      peg$c168 = "_",
+	      peg$c169 = peg$literalExpectation("_", false),
+	      peg$c170 = /^[a-z]/,
+	      peg$c171 = peg$classExpectation([["a", "z"]], false, false),
+	      peg$c172 = /^[\xC0-\xD6]/,
+	      peg$c173 = peg$classExpectation([["\xC0", "\xD6"]], false, false),
+	      peg$c174 = /^[\xD8-\xF6]/,
+	      peg$c175 = peg$classExpectation([["\xD8", "\xF6"]], false, false),
+	      peg$c176 = /^[\xF8-\u02FF]/,
+	      peg$c177 = peg$classExpectation([["\xF8", "\u02FF"]], false, false),
+	      peg$c178 = /^[\u0370-\u037D]/,
+	      peg$c179 = peg$classExpectation([["\u0370", "\u037D"]], false, false),
+	      peg$c180 = /^[\u037F-\u1FFF]/,
+	      peg$c181 = peg$classExpectation([["\u037F", "\u1FFF"]], false, false),
+	      peg$c182 = /^[\u200C-\u200D]/,
+	      peg$c183 = peg$classExpectation([["\u200C", "\u200D"]], false, false),
+	      peg$c184 = /^[\u2070-\u218F]/,
+	      peg$c185 = peg$classExpectation([["\u2070", "\u218F"]], false, false),
+	      peg$c186 = /^[\u2C00-\u2FEF]/,
+	      peg$c187 = peg$classExpectation([["\u2C00", "\u2FEF"]], false, false),
+	      peg$c188 = /^[\u3001-\uD7FF]/,
+	      peg$c189 = peg$classExpectation([["\u3001", "\uD7FF"]], false, false),
+	      peg$c190 = /^[\uF900-\uFDCF]/,
+	      peg$c191 = peg$classExpectation([["\uF900", "\uFDCF"]], false, false),
+	      peg$c192 = /^[\uFDF0-\uFFFD]/,
+	      peg$c193 = peg$classExpectation([["\uFDF0", "\uFFFD"]], false, false),
+	      peg$c194 = /^[\xB7]/,
+	      peg$c195 = peg$classExpectation(["\xB7"], false, false),
+	      peg$c196 = /^[\u0300-\u036F]/,
+	      peg$c197 = peg$classExpectation([["\u0300", "\u036F"]], false, false),
+	      peg$c198 = /^[\u203F-\u2040]/,
+	      peg$c199 = peg$classExpectation([["\u203F", "\u2040"]], false, false),
+	      peg$c200 = function(startchar, chars) {
+	          return startchar + chars.join('');
+	        },
+	      peg$c201 = peg$otherExpectation("whitespace"),
+	      peg$c202 = function(whitespace) { return whitespace.join("") },
+	      peg$c203 = /^[ \t\n\r]/,
+	      peg$c204 = peg$classExpectation([" ", "\t", "\n", "\r"], false, false),
+	
+	      peg$currPos          = 0,
+	      peg$savedPos         = 0,
+	      peg$posDetailsCache  = [{ line: 1, column: 1 }],
+	      peg$maxFailPos       = 0,
+	      peg$maxFailExpected  = [],
+	      peg$silentFails      = 0,
+	
+	      peg$resultsCache = {},
+	
+	      peg$result;
+	
+	  if ("startRule" in options) {
+	    if (!(options.startRule in peg$startRuleFunctions)) {
+	      throw new Error("Can't start parsing from rule \"" + options.startRule + "\".");
+	    }
+	
+	    peg$startRuleFunction = peg$startRuleFunctions[options.startRule];
+	  }
+	
+	  function text() {
+	    return input.substring(peg$savedPos, peg$currPos);
+	  }
+	
+	  function location() {
+	    return peg$computeLocation(peg$savedPos, peg$currPos);
+	  }
+	
+	  function expected(description, location) {
+	    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
+	
+	    throw peg$buildStructuredError(
+	      [peg$otherExpectation(description)],
+	      input.substring(peg$savedPos, peg$currPos),
+	      location
+	    );
+	  }
+	
+	  function error(message, location) {
+	    location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
+	
+	    throw peg$buildSimpleError(message, location);
+	  }
+	
+	  function peg$literalExpectation(text, ignoreCase) {
+	    return { type: "literal", text: text, ignoreCase: ignoreCase };
+	  }
+	
+	  function peg$classExpectation(parts, inverted, ignoreCase) {
+	    return { type: "class", parts: parts, inverted: inverted, ignoreCase: ignoreCase };
+	  }
+	
+	  function peg$anyExpectation() {
+	    return { type: "any" };
+	  }
+	
+	  function peg$endExpectation() {
+	    return { type: "end" };
+	  }
+	
+	  function peg$otherExpectation(description) {
+	    return { type: "other", description: description };
+	  }
+	
+	  function peg$computePosDetails(pos) {
+	    var details = peg$posDetailsCache[pos], p;
+	
+	    if (details) {
+	      return details;
+	    } else {
+	      p = pos - 1;
+	      while (!peg$posDetailsCache[p]) {
+	        p--;
+	      }
+	
+	      details = peg$posDetailsCache[p];
+	      details = {
+	        line:   details.line,
+	        column: details.column
+	      };
+	
+	      while (p < pos) {
+	        if (input.charCodeAt(p) === 10) {
+	          details.line++;
+	          details.column = 1;
 	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
+	          details.column++;
 	        }
+	
+	        p++;
+	      }
+	
+	      peg$posDetailsCache[pos] = details;
+	      return details;
+	    }
+	  }
+	
+	  function peg$computeLocation(startPos, endPos) {
+	    var startPosDetails = peg$computePosDetails(startPos),
+	        endPosDetails   = peg$computePosDetails(endPos);
+	
+	    return {
+	      start: {
+	        offset: startPos,
+	        line:   startPosDetails.line,
+	        column: startPosDetails.column
+	      },
+	      end: {
+	        offset: endPos,
+	        line:   endPosDetails.line,
+	        column: endPosDetails.column
+	      }
+	    };
+	  }
+	
+	  function peg$fail(expected) {
+	    if (peg$currPos < peg$maxFailPos) { return; }
+	
+	    if (peg$currPos > peg$maxFailPos) {
+	      peg$maxFailPos = peg$currPos;
+	      peg$maxFailExpected = [];
+	    }
+	
+	    peg$maxFailExpected.push(expected);
+	  }
+	
+	  function peg$buildSimpleError(message, location) {
+	    return new peg$SyntaxError(message, null, null, location);
+	  }
+	
+	  function peg$buildStructuredError(expected, found, location) {
+	    return new peg$SyntaxError(
+	      peg$SyntaxError.buildMessage(expected, found),
+	      expected,
+	      found,
+	      location
+	    );
+	  }
+	
+	  function peg$parseItemPathExpression() {
+	    var s0, s1, s2;
+	
+	    var key    = peg$currPos * 42 + 0,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$parseUnionPaths();
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parse_();
+	      if (s2 !== peg$FAILED) {
+	        peg$savedPos = s0;
+	        s1 = peg$c0(s1);
+	        s0 = s1;
 	      } else {
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parseExceptPaths();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
 	    }
 	
-	    function peg$parseUnionKeyword() {
-	      var s0, s1;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 2,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseUnionPaths() {
+	    var s0, s1, s2, s3, s4, s5;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 1,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 5) === peg$c2) {
-	        s1 = peg$c2;
-	        peg$currPos += 5;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c3); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c4(s1);
-	      }
-	      s0 = s1;
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
 	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	      return cached.result;
 	    }
 	
-	    function peg$parseExceptPaths() {
-	      var s0, s1, s2, s3, s4, s5;
-	
-	      var key    = peg$currPos * 42 + 3,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parseIntersectPaths();
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parse_();
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseExceptKeyword();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parse_();
-	            if (s4 !== peg$FAILED) {
-	              s5 = peg$parseExceptPaths();
-	              if (s5 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c5(s1, s5);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
-	              }
-	            } else {
-	              peg$currPos = s0;
-	              s0 = peg$FAILED;
-	            }
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
-	          }
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parseIntersectPaths();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseExceptKeyword() {
-	      var s0, s1;
-	
-	      var key    = peg$currPos * 42 + 4,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 6) === peg$c6) {
-	        s1 = peg$c6;
-	        peg$currPos += 6;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c7); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c8(s1);
-	      }
-	      s0 = s1;
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseIntersectPaths() {
-	      var s0, s1, s2, s3, s4, s5;
-	
-	      var key    = peg$currPos * 42 + 5,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parsePathExpression();
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parse_();
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseIntersectKeyword();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parse_();
-	            if (s4 !== peg$FAILED) {
-	              s5 = peg$parseIntersectPaths();
-	              if (s5 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c9(s1, s5);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
-	              }
-	            } else {
-	              peg$currPos = s0;
-	              s0 = peg$FAILED;
-	            }
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
-	          }
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parsePathExpression();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseIntersectKeyword() {
-	      var s0, s1;
-	
-	      var key    = peg$currPos * 42 + 6,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 9) === peg$c10) {
-	        s1 = peg$c10;
-	        peg$currPos += 9;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c11); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c12(s1);
-	      }
-	      s0 = s1;
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseSlice() {
-	      var s0, s1, s2, s3, s4;
-	
-	      var key    = peg$currPos * 42 + 7,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 91) {
-	        s1 = peg$c13;
-	        peg$currPos++;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c14); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parseInteger();
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseSliceEnd();
-	          if (s3 === peg$FAILED) {
-	            s3 = null;
-	          }
-	          if (s3 !== peg$FAILED) {
-	            if (input.charCodeAt(peg$currPos) === 93) {
-	              s4 = peg$c15;
-	              peg$currPos++;
-	            } else {
-	              s4 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c16); }
-	            }
-	            if (s4 !== peg$FAILED) {
+	    s0 = peg$currPos;
+	    s1 = peg$parseExceptPaths();
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parse_();
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseUnionKeyword();
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parse_();
+	          if (s4 !== peg$FAILED) {
+	            s5 = peg$parseUnionPaths();
+	            if (s5 !== peg$FAILED) {
 	              peg$savedPos = s0;
-	              s1 = peg$c17(s2, s3);
+	              s1 = peg$c1(s1, s5);
 	              s0 = s1;
 	            } else {
 	              peg$currPos = s0;
@@ -34605,105 +35581,170 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parseExceptPaths();
 	    }
 	
-	    function peg$parseSliceEnd() {
-	      var s0, s1, s2;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 8,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseUnionKeyword() {
+	    var s0, s1;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 2,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 58) {
-	        s1 = peg$c18;
-	        peg$currPos++;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c19); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parseInteger();
-	        if (s2 === peg$FAILED) {
-	          s2 = null;
-	        }
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c20(s2);
-	          s0 = s1;
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
 	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	      return cached.result;
 	    }
 	
-	    function peg$parseInteger() {
-	      var s0, s1, s2, s3;
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 5) === peg$c2) {
+	      s1 = peg$c2;
+	      peg$currPos += 5;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c3); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c4(s1);
+	    }
+	    s0 = s1;
 	
-	      var key    = peg$currPos * 42 + 9,
-	          cached = peg$resultsCache[key];
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	    return s0;
+	  }
 	
-	        return cached.result;
-	      }
+	  function peg$parseExceptPaths() {
+	    var s0, s1, s2, s3, s4, s5;
 	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 45) {
-	        s1 = peg$c21;
-	        peg$currPos++;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c22); }
-	      }
-	      if (s1 === peg$FAILED) {
-	        s1 = null;
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = [];
-	        if (peg$c23.test(input.charAt(peg$currPos))) {
-	          s3 = input.charAt(peg$currPos);
-	          peg$currPos++;
-	        } else {
-	          s3 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c24); }
-	        }
+	    var key    = peg$currPos * 42 + 3,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$parseIntersectPaths();
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parse_();
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseExceptKeyword();
 	        if (s3 !== peg$FAILED) {
-	          while (s3 !== peg$FAILED) {
-	            s2.push(s3);
-	            if (peg$c23.test(input.charAt(peg$currPos))) {
-	              s3 = input.charAt(peg$currPos);
-	              peg$currPos++;
+	          s4 = peg$parse_();
+	          if (s4 !== peg$FAILED) {
+	            s5 = peg$parseExceptPaths();
+	            if (s5 !== peg$FAILED) {
+	              peg$savedPos = s0;
+	              s1 = peg$c5(s1, s5);
+	              s0 = s1;
 	            } else {
-	              s3 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c24); }
+	              peg$currPos = s0;
+	              s0 = peg$FAILED;
 	            }
+	          } else {
+	            peg$currPos = s0;
+	            s0 = peg$FAILED;
 	          }
 	        } else {
-	          s2 = peg$FAILED;
+	          peg$currPos = s0;
+	          s0 = peg$FAILED;
 	        }
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c25(s1, s2);
-	          s0 = s1;
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parseIntersectPaths();
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseExceptKeyword() {
+	    var s0, s1;
+	
+	    var key    = peg$currPos * 42 + 4,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 6) === peg$c6) {
+	      s1 = peg$c6;
+	      peg$currPos += 6;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c7); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c8(s1);
+	    }
+	    s0 = s1;
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseIntersectPaths() {
+	    var s0, s1, s2, s3, s4, s5;
+	
+	    var key    = peg$currPos * 42 + 5,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$parsePathExpression();
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parse_();
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseIntersectKeyword();
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parse_();
+	          if (s4 !== peg$FAILED) {
+	            s5 = peg$parseIntersectPaths();
+	            if (s5 !== peg$FAILED) {
+	              peg$savedPos = s0;
+	              s1 = peg$c9(s1, s5);
+	              s0 = s1;
+	            } else {
+	              peg$currPos = s0;
+	              s0 = peg$FAILED;
+	            }
+	          } else {
+	            peg$currPos = s0;
+	            s0 = peg$FAILED;
+	          }
 	        } else {
 	          peg$currPos = s0;
 	          s0 = peg$FAILED;
@@ -34712,70 +35753,272 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parsePathExpression();
 	    }
 	
-	    function peg$parsePathExpression() {
-	      var s0, s1, s2, s3, s4, s5, s6, s7;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 10,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseIntersectKeyword() {
+	    var s0, s1;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 6,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      s1 = peg$currPos;
-	      peg$silentFails++;
-	      s2 = peg$parseOrPredicates();
-	      peg$silentFails--;
-	      if (s2 === peg$FAILED) {
-	        s1 = void 0;
-	      } else {
-	        peg$currPos = s1;
-	        s1 = peg$FAILED;
-	      }
-	      if (s1 !== peg$FAILED) {
-	        if (input.charCodeAt(peg$currPos) === 40) {
-	          s2 = peg$c26;
-	          peg$currPos++;
-	        } else {
-	          s2 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c27); }
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 9) === peg$c10) {
+	      s1 = peg$c10;
+	      peg$currPos += 9;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c11); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c12(s1);
+	    }
+	    s0 = s1;
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseSlice() {
+	    var s0, s1, s2, s3, s4;
+	
+	    var key    = peg$currPos * 42 + 7,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 91) {
+	      s1 = peg$c13;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c14); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parseInteger();
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseSliceEnd();
+	        if (s3 === peg$FAILED) {
+	          s3 = null;
 	        }
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parse_();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parseUnionPaths();
-	            if (s4 !== peg$FAILED) {
-	              s5 = peg$parse_();
-	              if (s5 !== peg$FAILED) {
-	                if (input.charCodeAt(peg$currPos) === 41) {
-	                  s6 = peg$c28;
-	                  peg$currPos++;
-	                } else {
-	                  s6 = peg$FAILED;
-	                  if (peg$silentFails === 0) { peg$fail(peg$c29); }
+	        if (s3 !== peg$FAILED) {
+	          if (input.charCodeAt(peg$currPos) === 93) {
+	            s4 = peg$c15;
+	            peg$currPos++;
+	          } else {
+	            s4 = peg$FAILED;
+	            if (peg$silentFails === 0) { peg$fail(peg$c16); }
+	          }
+	          if (s4 !== peg$FAILED) {
+	            peg$savedPos = s0;
+	            s1 = peg$c17(s2, s3);
+	            s0 = s1;
+	          } else {
+	            peg$currPos = s0;
+	            s0 = peg$FAILED;
+	          }
+	        } else {
+	          peg$currPos = s0;
+	          s0 = peg$FAILED;
+	        }
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseSliceEnd() {
+	    var s0, s1, s2;
+	
+	    var key    = peg$currPos * 42 + 8,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 58) {
+	      s1 = peg$c18;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c19); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parseInteger();
+	      if (s2 === peg$FAILED) {
+	        s2 = null;
+	      }
+	      if (s2 !== peg$FAILED) {
+	        peg$savedPos = s0;
+	        s1 = peg$c20(s2);
+	        s0 = s1;
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseInteger() {
+	    var s0, s1, s2, s3;
+	
+	    var key    = peg$currPos * 42 + 9,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 45) {
+	      s1 = peg$c21;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c22); }
+	    }
+	    if (s1 === peg$FAILED) {
+	      s1 = null;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = [];
+	      if (peg$c23.test(input.charAt(peg$currPos))) {
+	        s3 = input.charAt(peg$currPos);
+	        peg$currPos++;
+	      } else {
+	        s3 = peg$FAILED;
+	        if (peg$silentFails === 0) { peg$fail(peg$c24); }
+	      }
+	      if (s3 !== peg$FAILED) {
+	        while (s3 !== peg$FAILED) {
+	          s2.push(s3);
+	          if (peg$c23.test(input.charAt(peg$currPos))) {
+	            s3 = input.charAt(peg$currPos);
+	            peg$currPos++;
+	          } else {
+	            s3 = peg$FAILED;
+	            if (peg$silentFails === 0) { peg$fail(peg$c24); }
+	          }
+	        }
+	      } else {
+	        s2 = peg$FAILED;
+	      }
+	      if (s2 !== peg$FAILED) {
+	        peg$savedPos = s0;
+	        s1 = peg$c25(s1, s2);
+	        s0 = s1;
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parsePathExpression() {
+	    var s0, s1, s2, s3, s4, s5, s6, s7;
+	
+	    var key    = peg$currPos * 42 + 10,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$currPos;
+	    peg$silentFails++;
+	    s2 = peg$parseOrPredicates();
+	    peg$silentFails--;
+	    if (s2 === peg$FAILED) {
+	      s1 = void 0;
+	    } else {
+	      peg$currPos = s1;
+	      s1 = peg$FAILED;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      if (input.charCodeAt(peg$currPos) === 40) {
+	        s2 = peg$c26;
+	        peg$currPos++;
+	      } else {
+	        s2 = peg$FAILED;
+	        if (peg$silentFails === 0) { peg$fail(peg$c27); }
+	      }
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parse_();
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parseUnionPaths();
+	          if (s4 !== peg$FAILED) {
+	            s5 = peg$parse_();
+	            if (s5 !== peg$FAILED) {
+	              if (input.charCodeAt(peg$currPos) === 41) {
+	                s6 = peg$c28;
+	                peg$currPos++;
+	              } else {
+	                s6 = peg$FAILED;
+	                if (peg$silentFails === 0) { peg$fail(peg$c29); }
+	              }
+	              if (s6 !== peg$FAILED) {
+	                s7 = peg$parseSlice();
+	                if (s7 === peg$FAILED) {
+	                  s7 = null;
 	                }
-	                if (s6 !== peg$FAILED) {
-	                  s7 = peg$parseSlice();
-	                  if (s7 === peg$FAILED) {
-	                    s7 = null;
-	                  }
-	                  if (s7 !== peg$FAILED) {
-	                    peg$savedPos = s0;
-	                    s1 = peg$c30(s4, s7);
-	                    s0 = s1;
-	                  } else {
-	                    peg$currPos = s0;
-	                    s0 = peg$FAILED;
-	                  }
+	                if (s7 !== peg$FAILED) {
+	                  peg$savedPos = s0;
+	                  s1 = peg$c30(s4, s7);
+	                  s0 = s1;
 	                } else {
 	                  peg$currPos = s0;
 	                  s0 = peg$FAILED;
@@ -34800,367 +36043,54 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parseItemPath();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parseItemPath();
 	    }
 	
-	    function peg$parseItemPath() {
-	      var s0, s1, s2, s3, s4;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 11,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseItemPath() {
+	    var s0, s1, s2, s3, s4;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 11,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 47) {
-	        s1 = peg$c31;
-	        peg$currPos++;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c32); }
-	      }
-	      if (s1 === peg$FAILED) {
-	        s1 = null;
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parsePathStep();
-	        if (s2 !== peg$FAILED) {
-	          s3 = [];
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 47) {
+	      s1 = peg$c31;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c32); }
+	    }
+	    if (s1 === peg$FAILED) {
+	      s1 = null;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parsePathStep();
+	      if (s2 !== peg$FAILED) {
+	        s3 = [];
+	        s4 = peg$parseItemPathTrailingStep();
+	        while (s4 !== peg$FAILED) {
+	          s3.push(s4);
 	          s4 = peg$parseItemPathTrailingStep();
-	          while (s4 !== peg$FAILED) {
-	            s3.push(s4);
-	            s4 = peg$parseItemPathTrailingStep();
-	          }
-	          if (s3 !== peg$FAILED) {
-	            peg$savedPos = s0;
-	            s1 = peg$c33(s1, s2, s3);
-	            s0 = s1;
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
-	          }
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
 	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parsePathStep() {
-	      var s0, s1, s2, s3, s4, s5;
-	
-	      var key    = peg$currPos * 42 + 12,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parsePathStepAxis();
-	      if (s1 === peg$FAILED) {
-	        s1 = null;
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parsePathStepType();
-	        if (s2 === peg$FAILED) {
-	          s2 = null;
-	        }
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseOrPredicates();
-	          if (s3 === peg$FAILED) {
-	            s3 = null;
-	          }
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parseSlice();
-	            if (s4 === peg$FAILED) {
-	              s4 = null;
-	            }
-	            if (s4 !== peg$FAILED) {
-	              peg$savedPos = peg$currPos;
-	              s5 = peg$c34(s1, s2, s3, s4);
-	              if (s5) {
-	                s5 = void 0;
-	              } else {
-	                s5 = peg$FAILED;
-	              }
-	              if (s5 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c35(s1, s2, s3, s4);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
-	              }
-	            } else {
-	              peg$currPos = s0;
-	              s0 = peg$FAILED;
-	            }
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
-	          }
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parsePathStepAxis() {
-	      var s0, s1;
-	
-	      var key    = peg$currPos * 42 + 13,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 18) === peg$c36) {
-	        s1 = peg$c36;
-	        peg$currPos += 18;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c37); }
-	      }
-	      if (s1 === peg$FAILED) {
-	        if (input.substr(peg$currPos, 10) === peg$c38) {
-	          s1 = peg$c38;
-	          peg$currPos += 10;
-	        } else {
-	          s1 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c39); }
-	        }
-	        if (s1 === peg$FAILED) {
-	          if (input.substr(peg$currPos, 7) === peg$c40) {
-	            s1 = peg$c40;
-	            peg$currPos += 7;
-	          } else {
-	            s1 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c41); }
-	          }
-	          if (s1 === peg$FAILED) {
-	            if (input.substr(peg$currPos, 20) === peg$c42) {
-	              s1 = peg$c42;
-	              peg$currPos += 20;
-	            } else {
-	              s1 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c43); }
-	            }
-	            if (s1 === peg$FAILED) {
-	              if (input.substr(peg$currPos, 12) === peg$c44) {
-	                s1 = peg$c44;
-	                peg$currPos += 12;
-	              } else {
-	                s1 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c45); }
-	              }
-	              if (s1 === peg$FAILED) {
-	                if (input.substr(peg$currPos, 19) === peg$c46) {
-	                  s1 = peg$c46;
-	                  peg$currPos += 19;
-	                } else {
-	                  s1 = peg$FAILED;
-	                  if (peg$silentFails === 0) { peg$fail(peg$c47); }
-	                }
-	                if (s1 === peg$FAILED) {
-	                  if (input.substr(peg$currPos, 11) === peg$c48) {
-	                    s1 = peg$c48;
-	                    peg$currPos += 11;
-	                  } else {
-	                    s1 = peg$FAILED;
-	                    if (peg$silentFails === 0) { peg$fail(peg$c49); }
-	                  }
-	                  if (s1 === peg$FAILED) {
-	                    if (input.substr(peg$currPos, 19) === peg$c50) {
-	                      s1 = peg$c50;
-	                      peg$currPos += 19;
-	                    } else {
-	                      s1 = peg$FAILED;
-	                      if (peg$silentFails === 0) { peg$fail(peg$c51); }
-	                    }
-	                    if (s1 === peg$FAILED) {
-	                      if (input.substr(peg$currPos, 11) === peg$c52) {
-	                        s1 = peg$c52;
-	                        peg$currPos += 11;
-	                      } else {
-	                        s1 = peg$FAILED;
-	                        if (peg$silentFails === 0) { peg$fail(peg$c53); }
-	                      }
-	                      if (s1 === peg$FAILED) {
-	                        if (input.substr(peg$currPos, 8) === peg$c54) {
-	                          s1 = peg$c54;
-	                          peg$currPos += 8;
-	                        } else {
-	                          s1 = peg$FAILED;
-	                          if (peg$silentFails === 0) { peg$fail(peg$c55); }
-	                        }
-	                        if (s1 === peg$FAILED) {
-	                          if (input.substr(peg$currPos, 6) === peg$c56) {
-	                            s1 = peg$c56;
-	                            peg$currPos += 6;
-	                          } else {
-	                            s1 = peg$FAILED;
-	                            if (peg$silentFails === 0) { peg$fail(peg$c57); }
-	                          }
-	                          if (s1 === peg$FAILED) {
-	                            if (input.substr(peg$currPos, 2) === peg$c58) {
-	                              s1 = peg$c58;
-	                              peg$currPos += 2;
-	                            } else {
-	                              s1 = peg$FAILED;
-	                              if (peg$silentFails === 0) { peg$fail(peg$c59); }
-	                            }
-	                            if (s1 === peg$FAILED) {
-	                              if (input.charCodeAt(peg$currPos) === 47) {
-	                                s1 = peg$c31;
-	                                peg$currPos++;
-	                              } else {
-	                                s1 = peg$FAILED;
-	                                if (peg$silentFails === 0) { peg$fail(peg$c32); }
-	                              }
-	                              if (s1 === peg$FAILED) {
-	                                if (input.substr(peg$currPos, 2) === peg$c60) {
-	                                  s1 = peg$c60;
-	                                  peg$currPos += 2;
-	                                } else {
-	                                  s1 = peg$FAILED;
-	                                  if (peg$silentFails === 0) { peg$fail(peg$c61); }
-	                                }
-	                                if (s1 === peg$FAILED) {
-	                                  if (input.charCodeAt(peg$currPos) === 46) {
-	                                    s1 = peg$c62;
-	                                    peg$currPos++;
-	                                  } else {
-	                                    s1 = peg$FAILED;
-	                                    if (peg$silentFails === 0) { peg$fail(peg$c63); }
-	                                  }
-	                                }
-	                              }
-	                            }
-	                          }
-	                        }
-	                      }
-	                    }
-	                  }
-	                }
-	              }
-	            }
-	          }
-	        }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c64(s1);
-	      }
-	      s0 = s1;
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parsePathStepType() {
-	      var s0, s1, s2, s3;
-	
-	      var key    = peg$currPos * 42 + 14,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parseName();
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = peg$currPos;
-	        s2 = peg$c65(s1);
-	        if (s2) {
-	          s2 = void 0;
-	        } else {
-	          s2 = peg$FAILED;
-	        }
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parse_();
-	          if (s3 !== peg$FAILED) {
-	            peg$savedPos = s0;
-	            s1 = peg$c66(s1);
-	            s0 = s1;
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
-	          }
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseItemPathTrailingStep() {
-	      var s0, s1, s2;
-	
-	      var key    = peg$currPos * 42 + 15,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 47) {
-	        s1 = peg$c31;
-	        peg$currPos++;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c32); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parsePathStep();
-	        if (s2 !== peg$FAILED) {
+	        if (s3 !== peg$FAILED) {
 	          peg$savedPos = s0;
-	          s1 = peg$c67(s2);
+	          s1 = peg$c33(s1, s2, s3);
 	          s0 = s1;
 	        } else {
 	          peg$currPos = s0;
@@ -35170,42 +36100,60 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
 	    }
 	
-	    function peg$parseOrPredicates() {
-	      var s0, s1, s2, s3, s4, s5;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 16,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parsePathStep() {
+	    var s0, s1, s2, s3, s4, s5;
 	
-	        return cached.result;
+	    var key    = peg$currPos * 42 + 12,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$parsePathStepAxis();
+	    if (s1 === peg$FAILED) {
+	      s1 = null;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parsePathStepType();
+	      if (s2 === peg$FAILED) {
+	        s2 = null;
 	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parseAndPredicates();
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parse_();
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseOrKeyword();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parse_();
-	            if (s4 !== peg$FAILED) {
-	              s5 = peg$parseOrPredicates();
-	              if (s5 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c68(s1, s5);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
-	              }
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseOrPredicates();
+	        if (s3 === peg$FAILED) {
+	          s3 = null;
+	        }
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parseSlice();
+	          if (s4 === peg$FAILED) {
+	            s4 = null;
+	          }
+	          if (s4 !== peg$FAILED) {
+	            peg$savedPos = peg$currPos;
+	            s5 = peg$c34(s1, s2, s3, s4);
+	            if (s5) {
+	              s5 = void 0;
+	            } else {
+	              s5 = peg$FAILED;
+	            }
+	            if (s5 !== peg$FAILED) {
+	              peg$savedPos = s0;
+	              s1 = peg$c35(s1, s2, s3, s4);
+	              s0 = s1;
 	            } else {
 	              peg$currPos = s0;
 	              s0 = peg$FAILED;
@@ -35222,76 +36170,285 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parseAndPredicates();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
 	    }
 	
-	    function peg$parseOrKeyword() {
-	      var s0, s1;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 17,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parsePathStepAxis() {
+	    var s0, s1;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 13,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 2) === peg$c69) {
-	        s1 = peg$c69;
-	        peg$currPos += 2;
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 18) === peg$c36) {
+	      s1 = peg$c36;
+	      peg$currPos += 18;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c37); }
+	    }
+	    if (s1 === peg$FAILED) {
+	      if (input.substr(peg$currPos, 10) === peg$c38) {
+	        s1 = peg$c38;
+	        peg$currPos += 10;
 	      } else {
 	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c70); }
+	        if (peg$silentFails === 0) { peg$fail(peg$c39); }
 	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c71(s1);
+	      if (s1 === peg$FAILED) {
+	        if (input.substr(peg$currPos, 7) === peg$c40) {
+	          s1 = peg$c40;
+	          peg$currPos += 7;
+	        } else {
+	          s1 = peg$FAILED;
+	          if (peg$silentFails === 0) { peg$fail(peg$c41); }
+	        }
+	        if (s1 === peg$FAILED) {
+	          if (input.substr(peg$currPos, 20) === peg$c42) {
+	            s1 = peg$c42;
+	            peg$currPos += 20;
+	          } else {
+	            s1 = peg$FAILED;
+	            if (peg$silentFails === 0) { peg$fail(peg$c43); }
+	          }
+	          if (s1 === peg$FAILED) {
+	            if (input.substr(peg$currPos, 12) === peg$c44) {
+	              s1 = peg$c44;
+	              peg$currPos += 12;
+	            } else {
+	              s1 = peg$FAILED;
+	              if (peg$silentFails === 0) { peg$fail(peg$c45); }
+	            }
+	            if (s1 === peg$FAILED) {
+	              if (input.substr(peg$currPos, 19) === peg$c46) {
+	                s1 = peg$c46;
+	                peg$currPos += 19;
+	              } else {
+	                s1 = peg$FAILED;
+	                if (peg$silentFails === 0) { peg$fail(peg$c47); }
+	              }
+	              if (s1 === peg$FAILED) {
+	                if (input.substr(peg$currPos, 11) === peg$c48) {
+	                  s1 = peg$c48;
+	                  peg$currPos += 11;
+	                } else {
+	                  s1 = peg$FAILED;
+	                  if (peg$silentFails === 0) { peg$fail(peg$c49); }
+	                }
+	                if (s1 === peg$FAILED) {
+	                  if (input.substr(peg$currPos, 19) === peg$c50) {
+	                    s1 = peg$c50;
+	                    peg$currPos += 19;
+	                  } else {
+	                    s1 = peg$FAILED;
+	                    if (peg$silentFails === 0) { peg$fail(peg$c51); }
+	                  }
+	                  if (s1 === peg$FAILED) {
+	                    if (input.substr(peg$currPos, 11) === peg$c52) {
+	                      s1 = peg$c52;
+	                      peg$currPos += 11;
+	                    } else {
+	                      s1 = peg$FAILED;
+	                      if (peg$silentFails === 0) { peg$fail(peg$c53); }
+	                    }
+	                    if (s1 === peg$FAILED) {
+	                      if (input.substr(peg$currPos, 8) === peg$c54) {
+	                        s1 = peg$c54;
+	                        peg$currPos += 8;
+	                      } else {
+	                        s1 = peg$FAILED;
+	                        if (peg$silentFails === 0) { peg$fail(peg$c55); }
+	                      }
+	                      if (s1 === peg$FAILED) {
+	                        if (input.substr(peg$currPos, 6) === peg$c56) {
+	                          s1 = peg$c56;
+	                          peg$currPos += 6;
+	                        } else {
+	                          s1 = peg$FAILED;
+	                          if (peg$silentFails === 0) { peg$fail(peg$c57); }
+	                        }
+	                        if (s1 === peg$FAILED) {
+	                          if (input.substr(peg$currPos, 2) === peg$c58) {
+	                            s1 = peg$c58;
+	                            peg$currPos += 2;
+	                          } else {
+	                            s1 = peg$FAILED;
+	                            if (peg$silentFails === 0) { peg$fail(peg$c59); }
+	                          }
+	                          if (s1 === peg$FAILED) {
+	                            if (input.charCodeAt(peg$currPos) === 47) {
+	                              s1 = peg$c31;
+	                              peg$currPos++;
+	                            } else {
+	                              s1 = peg$FAILED;
+	                              if (peg$silentFails === 0) { peg$fail(peg$c32); }
+	                            }
+	                            if (s1 === peg$FAILED) {
+	                              if (input.substr(peg$currPos, 2) === peg$c60) {
+	                                s1 = peg$c60;
+	                                peg$currPos += 2;
+	                              } else {
+	                                s1 = peg$FAILED;
+	                                if (peg$silentFails === 0) { peg$fail(peg$c61); }
+	                              }
+	                              if (s1 === peg$FAILED) {
+	                                if (input.charCodeAt(peg$currPos) === 46) {
+	                                  s1 = peg$c62;
+	                                  peg$currPos++;
+	                                } else {
+	                                  s1 = peg$FAILED;
+	                                  if (peg$silentFails === 0) { peg$fail(peg$c63); }
+	                                }
+	                              }
+	                            }
+	                          }
+	                        }
+	                      }
+	                    }
+	                  }
+	                }
+	              }
+	            }
+	          }
+	        }
 	      }
-	      s0 = s1;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c64(s1);
+	    }
+	    s0 = s1;
 	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      return s0;
+	    return s0;
+	  }
+	
+	  function peg$parsePathStepType() {
+	    var s0, s1, s2, s3;
+	
+	    var key    = peg$currPos * 42 + 14,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
 	    }
 	
-	    function peg$parseAndPredicates() {
-	      var s0, s1, s2, s3, s4, s5;
-	
-	      var key    = peg$currPos * 42 + 18,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
+	    s0 = peg$currPos;
+	    s1 = peg$parseName();
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = peg$currPos;
+	      s2 = peg$c65(s1);
+	      if (s2) {
+	        s2 = void 0;
+	      } else {
+	        s2 = peg$FAILED;
 	      }
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parse_();
+	        if (s3 !== peg$FAILED) {
+	          peg$savedPos = s0;
+	          s1 = peg$c66(s1);
+	          s0 = s1;
+	        } else {
+	          peg$currPos = s0;
+	          s0 = peg$FAILED;
+	        }
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
 	
-	      s0 = peg$currPos;
-	      s1 = peg$parseNotPredicate();
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parse_();
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseAndKeyword();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parse_();
-	            if (s4 !== peg$FAILED) {
-	              s5 = peg$parseAndPredicates();
-	              if (s5 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c72(s1, s5);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
-	              }
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseItemPathTrailingStep() {
+	    var s0, s1, s2;
+	
+	    var key    = peg$currPos * 42 + 15,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 47) {
+	      s1 = peg$c31;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c32); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parsePathStep();
+	      if (s2 !== peg$FAILED) {
+	        peg$savedPos = s0;
+	        s1 = peg$c67(s2);
+	        s0 = s1;
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseOrPredicates() {
+	    var s0, s1, s2, s3, s4, s5;
+	
+	    var key    = peg$currPos * 42 + 16,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$parseAndPredicates();
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parse_();
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseOrKeyword();
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parse_();
+	          if (s4 !== peg$FAILED) {
+	            s5 = peg$parseOrPredicates();
+	            if (s5 !== peg$FAILED) {
+	              peg$savedPos = s0;
+	              s1 = peg$c68(s1, s5);
+	              s0 = s1;
 	            } else {
 	              peg$currPos = s0;
 	              s0 = peg$FAILED;
@@ -35308,60 +36465,176 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parseNotPredicate();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parseAndPredicates();
 	    }
 	
-	    function peg$parseAndKeyword() {
-	      var s0, s1;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 19,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseOrKeyword() {
+	    var s0, s1;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 17,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 3) === peg$c73) {
-	        s1 = peg$c73;
-	        peg$currPos += 3;
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 2) === peg$c69) {
+	      s1 = peg$c69;
+	      peg$currPos += 2;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c70); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c71(s1);
+	    }
+	    s0 = s1;
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseAndPredicates() {
+	    var s0, s1, s2, s3, s4, s5;
+	
+	    var key    = peg$currPos * 42 + 18,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$parseNotPredicate();
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parse_();
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseAndKeyword();
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parse_();
+	          if (s4 !== peg$FAILED) {
+	            s5 = peg$parseAndPredicates();
+	            if (s5 !== peg$FAILED) {
+	              peg$savedPos = s0;
+	              s1 = peg$c72(s1, s5);
+	              s0 = s1;
+	            } else {
+	              peg$currPos = s0;
+	              s0 = peg$FAILED;
+	            }
+	          } else {
+	            peg$currPos = s0;
+	            s0 = peg$FAILED;
+	          }
+	        } else {
+	          peg$currPos = s0;
+	          s0 = peg$FAILED;
+	        }
 	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c74); }
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
 	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c75(s1);
-	      }
-	      s0 = s1;
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parseNotPredicate();
 	    }
 	
-	    function peg$parseNotPredicate() {
-	      var s0, s1, s2, s3, s4, s5;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 20,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseAndKeyword() {
+	    var s0, s1;
 	
-	        return cached.result;
+	    var key    = peg$currPos * 42 + 19,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 3) === peg$c73) {
+	      s1 = peg$c73;
+	      peg$currPos += 3;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c74); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c75(s1);
+	    }
+	    s0 = s1;
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseNotPredicate() {
+	    var s0, s1, s2, s3, s4, s5;
+	
+	    var key    = peg$currPos * 42 + 20,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = [];
+	    s2 = peg$currPos;
+	    s3 = peg$parseNotKeyword();
+	    if (s3 !== peg$FAILED) {
+	      s4 = [];
+	      s5 = peg$parsewhitespace();
+	      if (s5 !== peg$FAILED) {
+	        while (s5 !== peg$FAILED) {
+	          s4.push(s5);
+	          s5 = peg$parsewhitespace();
+	        }
+	      } else {
+	        s4 = peg$FAILED;
 	      }
-	
-	      s0 = peg$currPos;
-	      s1 = [];
+	      if (s4 !== peg$FAILED) {
+	        s3 = [s3, s4];
+	        s2 = s3;
+	      } else {
+	        peg$currPos = s2;
+	        s2 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s2;
+	      s2 = peg$FAILED;
+	    }
+	    while (s2 !== peg$FAILED) {
+	      s1.push(s2);
 	      s2 = peg$currPos;
 	      s3 = peg$parseNotKeyword();
 	      if (s3 !== peg$FAILED) {
@@ -35386,126 +36659,96 @@ var birchoutline =
 	        peg$currPos = s2;
 	        s2 = peg$FAILED;
 	      }
-	      while (s2 !== peg$FAILED) {
-	        s1.push(s2);
-	        s2 = peg$currPos;
-	        s3 = peg$parseNotKeyword();
-	        if (s3 !== peg$FAILED) {
-	          s4 = [];
-	          s5 = peg$parsewhitespace();
-	          if (s5 !== peg$FAILED) {
-	            while (s5 !== peg$FAILED) {
-	              s4.push(s5);
-	              s5 = peg$parsewhitespace();
-	            }
-	          } else {
-	            s4 = peg$FAILED;
-	          }
-	          if (s4 !== peg$FAILED) {
-	            s3 = [s3, s4];
-	            s2 = s3;
-	          } else {
-	            peg$currPos = s2;
-	            s2 = peg$FAILED;
-	          }
-	        } else {
-	          peg$currPos = s2;
-	          s2 = peg$FAILED;
-	        }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parsePredicateExpression();
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c76(s1, s2);
-	          s0 = s1;
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parsePredicateExpression();
+	      if (s2 !== peg$FAILED) {
+	        peg$savedPos = s0;
+	        s1 = peg$c76(s1, s2);
+	        s0 = s1;
 	      } else {
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
 	    }
 	
-	    function peg$parseNotKeyword() {
-	      var s0, s1;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 21,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseNotKeyword() {
+	    var s0, s1;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 21,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 3) === peg$c77) {
-	        s1 = peg$c77;
-	        peg$currPos += 3;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c78); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c79(s1);
-	      }
-	      s0 = s1;
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
 	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	      return cached.result;
 	    }
 	
-	    function peg$parsePredicateExpression() {
-	      var s0, s1, s2, s3, s4, s5;
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 3) === peg$c77) {
+	      s1 = peg$c77;
+	      peg$currPos += 3;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c78); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c79(s1);
+	    }
+	    s0 = s1;
 	
-	      var key    = peg$currPos * 42 + 22,
-	          cached = peg$resultsCache[key];
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	    return s0;
+	  }
 	
-	        return cached.result;
-	      }
+	  function peg$parsePredicateExpression() {
+	    var s0, s1, s2, s3, s4, s5;
 	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 40) {
-	        s1 = peg$c26;
-	        peg$currPos++;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c27); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parse_();
-	        if (s2 !== peg$FAILED) {
-	          s3 = peg$parseOrPredicates();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parse_();
-	            if (s4 !== peg$FAILED) {
-	              if (input.charCodeAt(peg$currPos) === 41) {
-	                s5 = peg$c28;
-	                peg$currPos++;
-	              } else {
-	                s5 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c29); }
-	              }
-	              if (s5 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c80(s3);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
-	              }
+	    var key    = peg$currPos * 42 + 22,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 40) {
+	      s1 = peg$c26;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c27); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parse_();
+	      if (s2 !== peg$FAILED) {
+	        s3 = peg$parseOrPredicates();
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parse_();
+	          if (s4 !== peg$FAILED) {
+	            if (input.charCodeAt(peg$currPos) === 41) {
+	              s5 = peg$c28;
+	              peg$currPos++;
+	            } else {
+	              s5 = peg$FAILED;
+	              if (peg$silentFails === 0) { peg$fail(peg$c29); }
+	            }
+	            if (s5 !== peg$FAILED) {
+	              peg$savedPos = s0;
+	              s1 = peg$c80(s3);
+	              s0 = s1;
 	            } else {
 	              peg$currPos = s0;
 	              s0 = peg$FAILED;
@@ -35522,77 +36765,77 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parseComparisionPredicate();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parseComparisionPredicate();
 	    }
 	
-	    function peg$parseComparisionPredicate() {
-	      var s0, s1, s2, s3, s4, s5, s6, s7, s8;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 23,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseComparisionPredicate() {
+	    var s0, s1, s2, s3, s4, s5, s6, s7, s8;
 	
-	        return cached.result;
+	    var key    = peg$currPos * 42 + 23,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    if (input.charCodeAt(peg$currPos) === 42) {
+	      s0 = peg$c81;
+	      peg$currPos++;
+	    } else {
+	      s0 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c82); }
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$currPos;
+	      s1 = peg$parsePredicateValue();
+	      if (s1 === peg$FAILED) {
+	        s1 = null;
 	      }
-	
-	      if (input.charCodeAt(peg$currPos) === 42) {
-	        s0 = peg$c81;
-	        peg$currPos++;
-	      } else {
-	        s0 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c82); }
-	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$currPos;
-	        s1 = peg$parsePredicateValue();
-	        if (s1 === peg$FAILED) {
-	          s1 = null;
-	        }
-	        if (s1 !== peg$FAILED) {
-	          s2 = peg$parse_();
-	          if (s2 !== peg$FAILED) {
-	            s3 = peg$parseRelation();
-	            if (s3 === peg$FAILED) {
-	              s3 = null;
-	            }
-	            if (s3 !== peg$FAILED) {
-	              s4 = peg$parse_();
-	              if (s4 !== peg$FAILED) {
-	                s5 = peg$parseModifier();
-	                if (s5 === peg$FAILED) {
-	                  s5 = null;
-	                }
-	                if (s5 !== peg$FAILED) {
-	                  s6 = peg$parse_();
-	                  if (s6 !== peg$FAILED) {
-	                    s7 = peg$parsePredicateValue();
-	                    if (s7 === peg$FAILED) {
-	                      s7 = null;
+	      if (s1 !== peg$FAILED) {
+	        s2 = peg$parse_();
+	        if (s2 !== peg$FAILED) {
+	          s3 = peg$parseRelation();
+	          if (s3 === peg$FAILED) {
+	            s3 = null;
+	          }
+	          if (s3 !== peg$FAILED) {
+	            s4 = peg$parse_();
+	            if (s4 !== peg$FAILED) {
+	              s5 = peg$parseModifier();
+	              if (s5 === peg$FAILED) {
+	                s5 = null;
+	              }
+	              if (s5 !== peg$FAILED) {
+	                s6 = peg$parse_();
+	                if (s6 !== peg$FAILED) {
+	                  s7 = peg$parsePredicateValue();
+	                  if (s7 === peg$FAILED) {
+	                    s7 = null;
+	                  }
+	                  if (s7 !== peg$FAILED) {
+	                    peg$savedPos = peg$currPos;
+	                    s8 = peg$c83(s1, s3, s5, s7);
+	                    if (s8) {
+	                      s8 = void 0;
+	                    } else {
+	                      s8 = peg$FAILED;
 	                    }
-	                    if (s7 !== peg$FAILED) {
-	                      peg$savedPos = peg$currPos;
-	                      s8 = peg$c83(s1, s3, s5, s7);
-	                      if (s8) {
-	                        s8 = void 0;
-	                      } else {
-	                        s8 = peg$FAILED;
-	                      }
-	                      if (s8 !== peg$FAILED) {
-	                        peg$savedPos = s0;
-	                        s1 = peg$c84(s1, s3, s5, s7);
-	                        s0 = s1;
-	                      } else {
-	                        peg$currPos = s0;
-	                        s0 = peg$FAILED;
-	                      }
+	                    if (s8 !== peg$FAILED) {
+	                      peg$savedPos = s0;
+	                      s1 = peg$c84(s1, s3, s5, s7);
+	                      s0 = s1;
 	                    } else {
 	                      peg$currPos = s0;
 	                      s0 = peg$FAILED;
@@ -35621,72 +36864,72 @@ var birchoutline =
 	          peg$currPos = s0;
 	          s0 = peg$FAILED;
 	        }
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parsePredicateValue() {
-	      var s0;
-	
-	      var key    = peg$currPos * 42 + 24,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$parseFunctionValue();
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$parseStringValue();
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseFunctionValue() {
-	      var s0, s1, s2, s3, s4;
-	
-	      var key    = peg$currPos * 42 + 25,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 64) {
-	        s1 = peg$c85;
-	        peg$currPos++;
 	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c86); }
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
 	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parseAttributePathSegmentName();
-	        if (s2 !== peg$FAILED) {
-	          s3 = [];
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parsePredicateValue() {
+	    var s0;
+	
+	    var key    = peg$currPos * 42 + 24,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$parseFunctionValue();
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$parseStringValue();
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseFunctionValue() {
+	    var s0, s1, s2, s3, s4;
+	
+	    var key    = peg$currPos * 42 + 25,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 64) {
+	      s1 = peg$c85;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c86); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parseAttributePathSegmentName();
+	      if (s2 !== peg$FAILED) {
+	        s3 = [];
+	        s4 = peg$parseAttributePathSegment();
+	        while (s4 !== peg$FAILED) {
+	          s3.push(s4);
 	          s4 = peg$parseAttributePathSegment();
-	          while (s4 !== peg$FAILED) {
-	            s3.push(s4);
-	            s4 = peg$parseAttributePathSegment();
-	          }
-	          if (s3 !== peg$FAILED) {
-	            peg$savedPos = s0;
-	            s1 = peg$c87(s2, s3);
-	            s0 = s1;
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
-	          }
+	        }
+	        if (s3 !== peg$FAILED) {
+	          peg$savedPos = s0;
+	          s1 = peg$c87(s2, s3);
+	          s0 = s1;
 	        } else {
 	          peg$currPos = s0;
 	          s0 = peg$FAILED;
@@ -35695,35 +36938,35 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$currPos;
-	        s1 = peg$parseFunctionName();
-	        if (s1 !== peg$FAILED) {
-	          if (input.charCodeAt(peg$currPos) === 40) {
-	            s2 = peg$c26;
-	            peg$currPos++;
-	          } else {
-	            s2 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c27); }
-	          }
-	          if (s2 !== peg$FAILED) {
-	            s3 = peg$parseItemPathExpression();
-	            if (s3 !== peg$FAILED) {
-	              if (input.charCodeAt(peg$currPos) === 41) {
-	                s4 = peg$c28;
-	                peg$currPos++;
-	              } else {
-	                s4 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c29); }
-	              }
-	              if (s4 !== peg$FAILED) {
-	                peg$savedPos = s0;
-	                s1 = peg$c88(s1, s3);
-	                s0 = s1;
-	              } else {
-	                peg$currPos = s0;
-	                s0 = peg$FAILED;
-	              }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    if (s0 === peg$FAILED) {
+	      s0 = peg$currPos;
+	      s1 = peg$parseFunctionName();
+	      if (s1 !== peg$FAILED) {
+	        if (input.charCodeAt(peg$currPos) === 40) {
+	          s2 = peg$c26;
+	          peg$currPos++;
+	        } else {
+	          s2 = peg$FAILED;
+	          if (peg$silentFails === 0) { peg$fail(peg$c27); }
+	        }
+	        if (s2 !== peg$FAILED) {
+	          s3 = peg$parseItemPathExpression();
+	          if (s3 !== peg$FAILED) {
+	            if (input.charCodeAt(peg$currPos) === 41) {
+	              s4 = peg$c28;
+	              peg$currPos++;
+	            } else {
+	              s4 = peg$FAILED;
+	              if (peg$silentFails === 0) { peg$fail(peg$c29); }
+	            }
+	            if (s4 !== peg$FAILED) {
+	              peg$savedPos = s0;
+	              s1 = peg$c88(s1, s3);
+	              s0 = s1;
 	            } else {
 	              peg$currPos = s0;
 	              s0 = peg$FAILED;
@@ -35736,267 +36979,270 @@ var birchoutline =
 	          peg$currPos = s0;
 	          s0 = peg$FAILED;
 	        }
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseAttributePathSegment() {
-	      var s0, s1, s2;
-	
-	      var key    = peg$currPos * 42 + 26,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 58) {
-	        s1 = peg$c18;
-	        peg$currPos++;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c19); }
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parseAttributePathSegmentName();
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c89(s2);
-	          s0 = s1;
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
 	      } else {
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
 	    }
 	
-	    function peg$parseAttributePathSegmentName() {
-	      var s0, s1, s2;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 27,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseAttributePathSegment() {
+	    var s0, s1, s2;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 26,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      s1 = [];
-	      s2 = peg$parseAttributePathSegmentNameChar();
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 58) {
+	      s1 = peg$c18;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c19); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parseAttributePathSegmentName();
 	      if (s2 !== peg$FAILED) {
-	        while (s2 !== peg$FAILED) {
-	          s1.push(s2);
-	          s2 = peg$parseAttributePathSegmentNameChar();
-	        }
-	      } else {
-	        s1 = peg$FAILED;
-	      }
-	      if (s1 !== peg$FAILED) {
 	        peg$savedPos = s0;
-	        s1 = peg$c90(s1);
-	      }
-	      s0 = s1;
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseAttributePathSegmentNameChar() {
-	      var s0, s1, s2;
-	
-	      var key    = peg$currPos * 42 + 28,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$currPos;
-	      peg$silentFails++;
-	      if (input.charCodeAt(peg$currPos) === 58) {
-	        s2 = peg$c18;
-	        peg$currPos++;
-	      } else {
-	        s2 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c19); }
-	      }
-	      peg$silentFails--;
-	      if (s2 === peg$FAILED) {
-	        s1 = void 0;
-	      } else {
-	        peg$currPos = s1;
-	        s1 = peg$FAILED;
-	      }
-	      if (s1 !== peg$FAILED) {
-	        s2 = peg$parseNameChar();
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c91(s2);
-	          s0 = s1;
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
+	        s1 = peg$c89(s2);
+	        s0 = s1;
 	      } else {
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
 	    }
 	
-	    function peg$parseFunctionName() {
-	      var s0, s1;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 29,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseAttributePathSegmentName() {
+	    var s0, s1, s2;
 	
-	        return cached.result;
+	    var key    = peg$currPos * 42 + 27,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = [];
+	    s2 = peg$parseAttributePathSegmentNameChar();
+	    if (s2 !== peg$FAILED) {
+	      while (s2 !== peg$FAILED) {
+	        s1.push(s2);
+	        s2 = peg$parseAttributePathSegmentNameChar();
 	      }
+	    } else {
+	      s1 = peg$FAILED;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c90(s1);
+	    }
+	    s0 = s1;
 	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 5) === peg$c92) {
-	        s1 = peg$c92;
-	        peg$currPos += 5;
-	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c93); }
-	      }
-	      if (s1 !== peg$FAILED) {
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseAttributePathSegmentNameChar() {
+	    var s0, s1, s2;
+	
+	    var key    = peg$currPos * 42 + 28,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$currPos;
+	    peg$silentFails++;
+	    if (input.charCodeAt(peg$currPos) === 58) {
+	      s2 = peg$c18;
+	      peg$currPos++;
+	    } else {
+	      s2 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c19); }
+	    }
+	    peg$silentFails--;
+	    if (s2 === peg$FAILED) {
+	      s1 = void 0;
+	    } else {
+	      peg$currPos = s1;
+	      s1 = peg$FAILED;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      s2 = peg$parseNameChar();
+	      if (s2 !== peg$FAILED) {
 	        peg$savedPos = s0;
-	        s1 = peg$c94(s1);
+	        s1 = peg$c91(s2);
+	        s0 = s1;
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
 	      }
-	      s0 = s1;
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
 	    }
 	
-	    function peg$parseRelation() {
-	      var s0, s1;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 30,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseFunctionName() {
+	    var s0, s1;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 29,
+	        cached = peg$resultsCache[key];
 	
-	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 10) === peg$c95) {
-	        s1 = peg$c95;
-	        peg$currPos += 10;
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 5) === peg$c92) {
+	      s1 = peg$c92;
+	      peg$currPos += 5;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c93); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c94(s1);
+	    }
+	    s0 = s1;
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseRelation() {
+	    var s0, s1;
+	
+	    var key    = peg$currPos * 42 + 30,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 10) === peg$c95) {
+	      s1 = peg$c95;
+	      peg$currPos += 10;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c96); }
+	    }
+	    if (s1 === peg$FAILED) {
+	      if (input.substr(peg$currPos, 8) === peg$c97) {
+	        s1 = peg$c97;
+	        peg$currPos += 8;
 	      } else {
 	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c96); }
+	        if (peg$silentFails === 0) { peg$fail(peg$c98); }
 	      }
 	      if (s1 === peg$FAILED) {
-	        if (input.substr(peg$currPos, 8) === peg$c97) {
-	          s1 = peg$c97;
+	        if (input.substr(peg$currPos, 8) === peg$c99) {
+	          s1 = peg$c99;
 	          peg$currPos += 8;
 	        } else {
 	          s1 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c98); }
+	          if (peg$silentFails === 0) { peg$fail(peg$c100); }
 	        }
 	        if (s1 === peg$FAILED) {
-	          if (input.substr(peg$currPos, 8) === peg$c99) {
-	            s1 = peg$c99;
-	            peg$currPos += 8;
+	          if (input.substr(peg$currPos, 4) === peg$c101) {
+	            s1 = peg$c101;
+	            peg$currPos += 4;
 	          } else {
 	            s1 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c100); }
+	            if (peg$silentFails === 0) { peg$fail(peg$c102); }
 	          }
 	          if (s1 === peg$FAILED) {
-	            if (input.substr(peg$currPos, 4) === peg$c101) {
-	              s1 = peg$c101;
-	              peg$currPos += 4;
+	            if (input.substr(peg$currPos, 7) === peg$c103) {
+	              s1 = peg$c103;
+	              peg$currPos += 7;
 	            } else {
 	              s1 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c102); }
+	              if (peg$silentFails === 0) { peg$fail(peg$c104); }
 	            }
 	            if (s1 === peg$FAILED) {
-	              if (input.substr(peg$currPos, 7) === peg$c103) {
-	                s1 = peg$c103;
-	                peg$currPos += 7;
+	              if (input.charCodeAt(peg$currPos) === 61) {
+	                s1 = peg$c105;
+	                peg$currPos++;
 	              } else {
 	                s1 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c104); }
+	                if (peg$silentFails === 0) { peg$fail(peg$c106); }
 	              }
 	              if (s1 === peg$FAILED) {
-	                if (input.charCodeAt(peg$currPos) === 61) {
-	                  s1 = peg$c105;
-	                  peg$currPos++;
+	                if (input.substr(peg$currPos, 2) === peg$c107) {
+	                  s1 = peg$c107;
+	                  peg$currPos += 2;
 	                } else {
 	                  s1 = peg$FAILED;
-	                  if (peg$silentFails === 0) { peg$fail(peg$c106); }
+	                  if (peg$silentFails === 0) { peg$fail(peg$c108); }
 	                }
 	                if (s1 === peg$FAILED) {
-	                  if (input.substr(peg$currPos, 2) === peg$c107) {
-	                    s1 = peg$c107;
+	                  if (input.substr(peg$currPos, 2) === peg$c109) {
+	                    s1 = peg$c109;
 	                    peg$currPos += 2;
 	                  } else {
 	                    s1 = peg$FAILED;
-	                    if (peg$silentFails === 0) { peg$fail(peg$c108); }
+	                    if (peg$silentFails === 0) { peg$fail(peg$c110); }
 	                  }
 	                  if (s1 === peg$FAILED) {
-	                    if (input.substr(peg$currPos, 2) === peg$c109) {
-	                      s1 = peg$c109;
+	                    if (input.substr(peg$currPos, 2) === peg$c111) {
+	                      s1 = peg$c111;
 	                      peg$currPos += 2;
 	                    } else {
 	                      s1 = peg$FAILED;
-	                      if (peg$silentFails === 0) { peg$fail(peg$c110); }
+	                      if (peg$silentFails === 0) { peg$fail(peg$c112); }
 	                    }
 	                    if (s1 === peg$FAILED) {
-	                      if (input.substr(peg$currPos, 2) === peg$c111) {
-	                        s1 = peg$c111;
-	                        peg$currPos += 2;
+	                      if (input.charCodeAt(peg$currPos) === 60) {
+	                        s1 = peg$c113;
+	                        peg$currPos++;
 	                      } else {
 	                        s1 = peg$FAILED;
-	                        if (peg$silentFails === 0) { peg$fail(peg$c112); }
+	                        if (peg$silentFails === 0) { peg$fail(peg$c114); }
 	                      }
 	                      if (s1 === peg$FAILED) {
-	                        if (input.charCodeAt(peg$currPos) === 60) {
-	                          s1 = peg$c113;
+	                        if (input.charCodeAt(peg$currPos) === 62) {
+	                          s1 = peg$c115;
 	                          peg$currPos++;
 	                        } else {
 	                          s1 = peg$FAILED;
-	                          if (peg$silentFails === 0) { peg$fail(peg$c114); }
-	                        }
-	                        if (s1 === peg$FAILED) {
-	                          if (input.charCodeAt(peg$currPos) === 62) {
-	                            s1 = peg$c115;
-	                            peg$currPos++;
-	                          } else {
-	                            s1 = peg$FAILED;
-	                            if (peg$silentFails === 0) { peg$fail(peg$c116); }
-	                          }
+	                          if (peg$silentFails === 0) { peg$fail(peg$c116); }
 	                        }
 	                      }
 	                    }
@@ -36007,88 +37253,85 @@ var birchoutline =
 	          }
 	        }
 	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c117(s1);
-	      }
-	      s0 = s1;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c117(s1);
+	    }
+	    s0 = s1;
 	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      return s0;
+	    return s0;
+	  }
+	
+	  function peg$parseModifier() {
+	    var s0, s1, s2, s3;
+	
+	    var key    = peg$currPos * 42 + 31,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
 	    }
 	
-	    function peg$parseModifier() {
-	      var s0, s1, s2, s3;
-	
-	      var key    = peg$currPos * 42 + 31,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      if (input.charCodeAt(peg$currPos) === 91) {
-	        s1 = peg$c13;
+	    s0 = peg$currPos;
+	    if (input.charCodeAt(peg$currPos) === 91) {
+	      s1 = peg$c13;
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c14); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      if (input.charCodeAt(peg$currPos) === 115) {
+	        s2 = peg$c118;
 	        peg$currPos++;
 	      } else {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c14); }
+	        s2 = peg$FAILED;
+	        if (peg$silentFails === 0) { peg$fail(peg$c119); }
 	      }
-	      if (s1 !== peg$FAILED) {
-	        if (input.charCodeAt(peg$currPos) === 115) {
-	          s2 = peg$c118;
+	      if (s2 === peg$FAILED) {
+	        if (input.charCodeAt(peg$currPos) === 105) {
+	          s2 = peg$c120;
 	          peg$currPos++;
 	        } else {
 	          s2 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c119); }
+	          if (peg$silentFails === 0) { peg$fail(peg$c121); }
 	        }
 	        if (s2 === peg$FAILED) {
-	          if (input.charCodeAt(peg$currPos) === 105) {
-	            s2 = peg$c120;
+	          if (input.charCodeAt(peg$currPos) === 110) {
+	            s2 = peg$c122;
 	            peg$currPos++;
 	          } else {
 	            s2 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c121); }
+	            if (peg$silentFails === 0) { peg$fail(peg$c123); }
 	          }
 	          if (s2 === peg$FAILED) {
-	            if (input.charCodeAt(peg$currPos) === 110) {
-	              s2 = peg$c122;
+	            if (input.charCodeAt(peg$currPos) === 100) {
+	              s2 = peg$c124;
 	              peg$currPos++;
 	            } else {
 	              s2 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c123); }
-	            }
-	            if (s2 === peg$FAILED) {
-	              if (input.charCodeAt(peg$currPos) === 100) {
-	                s2 = peg$c124;
-	                peg$currPos++;
-	              } else {
-	                s2 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c125); }
-	              }
+	              if (peg$silentFails === 0) { peg$fail(peg$c125); }
 	            }
 	          }
 	        }
-	        if (s2 !== peg$FAILED) {
-	          if (input.charCodeAt(peg$currPos) === 93) {
-	            s3 = peg$c15;
-	            peg$currPos++;
-	          } else {
-	            s3 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c16); }
-	          }
-	          if (s3 !== peg$FAILED) {
-	            peg$savedPos = s0;
-	            s1 = peg$c126(s2);
-	            s0 = s1;
-	          } else {
-	            peg$currPos = s0;
-	            s0 = peg$FAILED;
-	          }
+	      }
+	      if (s2 !== peg$FAILED) {
+	        if (input.charCodeAt(peg$currPos) === 93) {
+	          s3 = peg$c15;
+	          peg$currPos++;
+	        } else {
+	          s3 = peg$FAILED;
+	          if (peg$silentFails === 0) { peg$fail(peg$c16); }
+	        }
+	        if (s3 !== peg$FAILED) {
+	          peg$savedPos = s0;
+	          s1 = peg$c126(s2);
+	          s0 = s1;
 	        } else {
 	          peg$currPos = s0;
 	          s0 = peg$FAILED;
@@ -36097,42 +37340,42 @@ var birchoutline =
 	        peg$currPos = s0;
 	        s0 = peg$FAILED;
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
 	    }
 	
-	    function peg$parseStringValue() {
-	      var s0, s1, s2, s3, s4, s5;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 32,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseStringValue() {
+	    var s0, s1, s2, s3, s4, s5;
 	
-	        return cached.result;
+	    var key    = peg$currPos * 42 + 32,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = [];
+	    s2 = peg$currPos;
+	    s3 = peg$parse_();
+	    if (s3 !== peg$FAILED) {
+	      s4 = peg$parseQuotedString();
+	      if (s4 === peg$FAILED) {
+	        s4 = peg$parseUnquotedString();
 	      }
-	
-	      s0 = peg$currPos;
-	      s1 = [];
-	      s2 = peg$currPos;
-	      s3 = peg$parse_();
-	      if (s3 !== peg$FAILED) {
-	        s4 = peg$parseQuotedString();
-	        if (s4 === peg$FAILED) {
-	          s4 = peg$parseUnquotedString();
-	        }
-	        if (s4 !== peg$FAILED) {
-	          s5 = peg$parse_();
-	          if (s5 !== peg$FAILED) {
-	            s3 = [s3, s4, s5];
-	            s2 = s3;
-	          } else {
-	            peg$currPos = s2;
-	            s2 = peg$FAILED;
-	          }
+	      if (s4 !== peg$FAILED) {
+	        s5 = peg$parse_();
+	        if (s5 !== peg$FAILED) {
+	          s3 = [s3, s4, s5];
+	          s2 = s3;
 	        } else {
 	          peg$currPos = s2;
 	          s2 = peg$FAILED;
@@ -36141,25 +37384,25 @@ var birchoutline =
 	        peg$currPos = s2;
 	        s2 = peg$FAILED;
 	      }
-	      if (s2 !== peg$FAILED) {
-	        while (s2 !== peg$FAILED) {
-	          s1.push(s2);
-	          s2 = peg$currPos;
-	          s3 = peg$parse_();
-	          if (s3 !== peg$FAILED) {
-	            s4 = peg$parseQuotedString();
-	            if (s4 === peg$FAILED) {
-	              s4 = peg$parseUnquotedString();
-	            }
-	            if (s4 !== peg$FAILED) {
-	              s5 = peg$parse_();
-	              if (s5 !== peg$FAILED) {
-	                s3 = [s3, s4, s5];
-	                s2 = s3;
-	              } else {
-	                peg$currPos = s2;
-	                s2 = peg$FAILED;
-	              }
+	    } else {
+	      peg$currPos = s2;
+	      s2 = peg$FAILED;
+	    }
+	    if (s2 !== peg$FAILED) {
+	      while (s2 !== peg$FAILED) {
+	        s1.push(s2);
+	        s2 = peg$currPos;
+	        s3 = peg$parse_();
+	        if (s3 !== peg$FAILED) {
+	          s4 = peg$parseQuotedString();
+	          if (s4 === peg$FAILED) {
+	            s4 = peg$parseUnquotedString();
+	          }
+	          if (s4 !== peg$FAILED) {
+	            s5 = peg$parse_();
+	            if (s5 !== peg$FAILED) {
+	              s3 = [s3, s4, s5];
+	              s2 = s3;
 	            } else {
 	              peg$currPos = s2;
 	              s2 = peg$FAILED;
@@ -36168,74 +37411,74 @@ var birchoutline =
 	            peg$currPos = s2;
 	            s2 = peg$FAILED;
 	          }
+	        } else {
+	          peg$currPos = s2;
+	          s2 = peg$FAILED;
 	        }
-	      } else {
-	        s1 = peg$FAILED;
 	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c127(s1);
-	      }
-	      s0 = s1;
+	    } else {
+	      s1 = peg$FAILED;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c127(s1);
+	    }
+	    s0 = s1;
 	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      return s0;
+	    return s0;
+	  }
+	
+	  function peg$parseQuotedString() {
+	    var s0, s1, s2, s3;
+	
+	    var key    = peg$currPos * 42 + 33,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
 	    }
 	
-	    function peg$parseQuotedString() {
-	      var s0, s1, s2, s3;
-	
-	      var key    = peg$currPos * 42 + 33,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      peg$silentFails++;
+	    peg$silentFails++;
+	    s0 = peg$currPos;
+	    if (input.substr(peg$currPos, 2) === peg$c129) {
+	      s1 = peg$c129;
+	      peg$currPos += 2;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c130); }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c131();
+	    }
+	    s0 = s1;
+	    if (s0 === peg$FAILED) {
 	      s0 = peg$currPos;
-	      if (input.substr(peg$currPos, 2) === peg$c129) {
-	        s1 = peg$c129;
-	        peg$currPos += 2;
+	      if (input.charCodeAt(peg$currPos) === 34) {
+	        s1 = peg$c132;
+	        peg$currPos++;
 	      } else {
 	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c130); }
+	        if (peg$silentFails === 0) { peg$fail(peg$c133); }
 	      }
 	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = s0;
-	        s1 = peg$c131();
-	      }
-	      s0 = s1;
-	      if (s0 === peg$FAILED) {
-	        s0 = peg$currPos;
-	        if (input.charCodeAt(peg$currPos) === 34) {
-	          s1 = peg$c132;
-	          peg$currPos++;
-	        } else {
-	          s1 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c133); }
-	        }
-	        if (s1 !== peg$FAILED) {
-	          s2 = peg$parseChars();
-	          if (s2 !== peg$FAILED) {
-	            if (input.charCodeAt(peg$currPos) === 34) {
-	              s3 = peg$c132;
-	              peg$currPos++;
-	            } else {
-	              s3 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c133); }
-	            }
-	            if (s3 !== peg$FAILED) {
-	              peg$savedPos = s0;
-	              s1 = peg$c134(s2);
-	              s0 = s1;
-	            } else {
-	              peg$currPos = s0;
-	              s0 = peg$FAILED;
-	            }
+	        s2 = peg$parseChars();
+	        if (s2 !== peg$FAILED) {
+	          if (input.charCodeAt(peg$currPos) === 34) {
+	            s3 = peg$c132;
+	            peg$currPos++;
+	          } else {
+	            s3 = peg$FAILED;
+	            if (peg$silentFails === 0) { peg$fail(peg$c133); }
+	          }
+	          if (s3 !== peg$FAILED) {
+	            peg$savedPos = s0;
+	            s1 = peg$c134(s2);
+	            s0 = s1;
 	          } else {
 	            peg$currPos = s0;
 	            s0 = peg$FAILED;
@@ -36244,184 +37487,187 @@ var birchoutline =
 	          peg$currPos = s0;
 	          s0 = peg$FAILED;
 	        }
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
 	      }
-	      peg$silentFails--;
-	      if (s0 === peg$FAILED) {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c128); }
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    }
+	    peg$silentFails--;
+	    if (s0 === peg$FAILED) {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c128); }
 	    }
 	
-	    function peg$parseChars() {
-	      var s0, s1, s2;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 34,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseChars() {
+	    var s0, s1, s2;
 	
-	        return cached.result;
+	    var key    = peg$currPos * 42 + 34,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = [];
+	    s2 = peg$parseChar();
+	    if (s2 !== peg$FAILED) {
+	      while (s2 !== peg$FAILED) {
+	        s1.push(s2);
+	        s2 = peg$parseChar();
 	      }
+	    } else {
+	      s1 = peg$FAILED;
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c135(s1);
+	    }
+	    s0 = s1;
 	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseChar() {
+	    var s0, s1;
+	
+	    var key    = peg$currPos * 42 + 35,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    if (peg$c136.test(input.charAt(peg$currPos))) {
+	      s0 = input.charAt(peg$currPos);
+	      peg$currPos++;
+	    } else {
+	      s0 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c137); }
+	    }
+	    if (s0 === peg$FAILED) {
 	      s0 = peg$currPos;
-	      s1 = [];
-	      s2 = peg$parseChar();
-	      if (s2 !== peg$FAILED) {
-	        while (s2 !== peg$FAILED) {
-	          s1.push(s2);
-	          s2 = peg$parseChar();
-	        }
+	      if (input.substr(peg$currPos, 2) === peg$c138) {
+	        s1 = peg$c138;
+	        peg$currPos += 2;
 	      } else {
 	        s1 = peg$FAILED;
+	        if (peg$silentFails === 0) { peg$fail(peg$c139); }
 	      }
 	      if (s1 !== peg$FAILED) {
 	        peg$savedPos = s0;
-	        s1 = peg$c135(s1);
+	        s1 = peg$c140();
 	      }
 	      s0 = s1;
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseChar() {
-	      var s0, s1;
-	
-	      var key    = peg$currPos * 42 + 35,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      if (peg$c136.test(input.charAt(peg$currPos))) {
-	        s0 = input.charAt(peg$currPos);
-	        peg$currPos++;
-	      } else {
-	        s0 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c137); }
-	      }
 	      if (s0 === peg$FAILED) {
 	        s0 = peg$currPos;
-	        if (input.substr(peg$currPos, 2) === peg$c138) {
-	          s1 = peg$c138;
+	        if (input.substr(peg$currPos, 2) === peg$c141) {
+	          s1 = peg$c141;
 	          peg$currPos += 2;
 	        } else {
 	          s1 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c139); }
+	          if (peg$silentFails === 0) { peg$fail(peg$c142); }
 	        }
 	        if (s1 !== peg$FAILED) {
 	          peg$savedPos = s0;
-	          s1 = peg$c140();
+	          s1 = peg$c143();
 	        }
 	        s0 = s1;
 	        if (s0 === peg$FAILED) {
 	          s0 = peg$currPos;
-	          if (input.substr(peg$currPos, 2) === peg$c141) {
-	            s1 = peg$c141;
+	          if (input.substr(peg$currPos, 2) === peg$c144) {
+	            s1 = peg$c144;
 	            peg$currPos += 2;
 	          } else {
 	            s1 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c142); }
+	            if (peg$silentFails === 0) { peg$fail(peg$c145); }
 	          }
 	          if (s1 !== peg$FAILED) {
 	            peg$savedPos = s0;
-	            s1 = peg$c143();
+	            s1 = peg$c146();
 	          }
 	          s0 = s1;
 	          if (s0 === peg$FAILED) {
 	            s0 = peg$currPos;
-	            if (input.substr(peg$currPos, 2) === peg$c144) {
-	              s1 = peg$c144;
+	            if (input.substr(peg$currPos, 2) === peg$c147) {
+	              s1 = peg$c147;
 	              peg$currPos += 2;
 	            } else {
 	              s1 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c145); }
+	              if (peg$silentFails === 0) { peg$fail(peg$c148); }
 	            }
 	            if (s1 !== peg$FAILED) {
 	              peg$savedPos = s0;
-	              s1 = peg$c146();
+	              s1 = peg$c149();
 	            }
 	            s0 = s1;
 	            if (s0 === peg$FAILED) {
 	              s0 = peg$currPos;
-	              if (input.substr(peg$currPos, 2) === peg$c147) {
-	                s1 = peg$c147;
+	              if (input.substr(peg$currPos, 2) === peg$c150) {
+	                s1 = peg$c150;
 	                peg$currPos += 2;
 	              } else {
 	                s1 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c148); }
+	                if (peg$silentFails === 0) { peg$fail(peg$c151); }
 	              }
 	              if (s1 !== peg$FAILED) {
 	                peg$savedPos = s0;
-	                s1 = peg$c149();
+	                s1 = peg$c152();
 	              }
 	              s0 = s1;
 	              if (s0 === peg$FAILED) {
 	                s0 = peg$currPos;
-	                if (input.substr(peg$currPos, 2) === peg$c150) {
-	                  s1 = peg$c150;
+	                if (input.substr(peg$currPos, 2) === peg$c153) {
+	                  s1 = peg$c153;
 	                  peg$currPos += 2;
 	                } else {
 	                  s1 = peg$FAILED;
-	                  if (peg$silentFails === 0) { peg$fail(peg$c151); }
+	                  if (peg$silentFails === 0) { peg$fail(peg$c154); }
 	                }
 	                if (s1 !== peg$FAILED) {
 	                  peg$savedPos = s0;
-	                  s1 = peg$c152();
+	                  s1 = peg$c155();
 	                }
 	                s0 = s1;
 	                if (s0 === peg$FAILED) {
 	                  s0 = peg$currPos;
-	                  if (input.substr(peg$currPos, 2) === peg$c153) {
-	                    s1 = peg$c153;
+	                  if (input.substr(peg$currPos, 2) === peg$c156) {
+	                    s1 = peg$c156;
 	                    peg$currPos += 2;
 	                  } else {
 	                    s1 = peg$FAILED;
-	                    if (peg$silentFails === 0) { peg$fail(peg$c154); }
+	                    if (peg$silentFails === 0) { peg$fail(peg$c157); }
 	                  }
 	                  if (s1 !== peg$FAILED) {
 	                    peg$savedPos = s0;
-	                    s1 = peg$c155();
+	                    s1 = peg$c158();
 	                  }
 	                  s0 = s1;
 	                  if (s0 === peg$FAILED) {
 	                    s0 = peg$currPos;
-	                    if (input.substr(peg$currPos, 2) === peg$c156) {
-	                      s1 = peg$c156;
+	                    if (input.substr(peg$currPos, 2) === peg$c159) {
+	                      s1 = peg$c159;
 	                      peg$currPos += 2;
 	                    } else {
 	                      s1 = peg$FAILED;
-	                      if (peg$silentFails === 0) { peg$fail(peg$c157); }
+	                      if (peg$silentFails === 0) { peg$fail(peg$c160); }
 	                    }
 	                    if (s1 !== peg$FAILED) {
 	                      peg$savedPos = s0;
-	                      s1 = peg$c158();
+	                      s1 = peg$c161();
 	                    }
 	                    s0 = s1;
-	                    if (s0 === peg$FAILED) {
-	                      s0 = peg$currPos;
-	                      if (input.substr(peg$currPos, 2) === peg$c159) {
-	                        s1 = peg$c159;
-	                        peg$currPos += 2;
-	                      } else {
-	                        s1 = peg$FAILED;
-	                        if (peg$silentFails === 0) { peg$fail(peg$c160); }
-	                      }
-	                      if (s1 !== peg$FAILED) {
-	                        peg$savedPos = s0;
-	                        s1 = peg$c161();
-	                      }
-	                      s0 = s1;
-	                    }
 	                  }
 	                }
 	              }
@@ -36429,500 +37675,499 @@ var birchoutline =
 	          }
 	        }
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
 	    }
 	
-	    function peg$parseUnquotedString() {
-	      var s0, s1, s2;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 36,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseUnquotedString() {
+	    var s0, s1, s2;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 36,
+	        cached = peg$resultsCache[key];
 	
-	      peg$silentFails++;
-	      s0 = peg$currPos;
-	      if (peg$c23.test(input.charAt(peg$currPos))) {
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    peg$silentFails++;
+	    s0 = peg$currPos;
+	    if (peg$c23.test(input.charAt(peg$currPos))) {
+	      s1 = input.charAt(peg$currPos);
+	      peg$currPos++;
+	    } else {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c24); }
+	    }
+	    if (s1 === peg$FAILED) {
+	      if (peg$c162.test(input.charAt(peg$currPos))) {
 	        s1 = input.charAt(peg$currPos);
 	        peg$currPos++;
 	      } else {
 	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c24); }
+	        if (peg$silentFails === 0) { peg$fail(peg$c163); }
 	      }
 	      if (s1 === peg$FAILED) {
-	        if (peg$c162.test(input.charAt(peg$currPos))) {
-	          s1 = input.charAt(peg$currPos);
-	          peg$currPos++;
-	        } else {
-	          s1 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c163); }
-	        }
-	        if (s1 === peg$FAILED) {
-	          s1 = peg$parseName();
-	        }
+	        s1 = peg$parseName();
 	      }
-	      if (s1 !== peg$FAILED) {
-	        peg$savedPos = peg$currPos;
-	        s2 = peg$c164(s1);
-	        if (s2) {
-	          s2 = peg$FAILED;
-	        } else {
-	          s2 = void 0;
-	        }
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c165(s1);
-	          s0 = s1;
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = peg$currPos;
+	      s2 = peg$c164(s1);
+	      if (s2) {
+	        s2 = peg$FAILED;
 	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
+	        s2 = void 0;
 	      }
-	      peg$silentFails--;
-	      if (s0 === peg$FAILED) {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c128); }
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseNameStartChar() {
-	      var s0;
-	
-	      var key    = peg$currPos * 42 + 37,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      if (input.charCodeAt(peg$currPos) === 58) {
-	        s0 = peg$c18;
-	        peg$currPos++;
-	      } else {
-	        s0 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c19); }
-	      }
-	      if (s0 === peg$FAILED) {
-	        if (peg$c166.test(input.charAt(peg$currPos))) {
-	          s0 = input.charAt(peg$currPos);
-	          peg$currPos++;
-	        } else {
-	          s0 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c167); }
-	        }
-	        if (s0 === peg$FAILED) {
-	          if (input.charCodeAt(peg$currPos) === 95) {
-	            s0 = peg$c168;
-	            peg$currPos++;
-	          } else {
-	            s0 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c169); }
-	          }
-	          if (s0 === peg$FAILED) {
-	            if (peg$c170.test(input.charAt(peg$currPos))) {
-	              s0 = input.charAt(peg$currPos);
-	              peg$currPos++;
-	            } else {
-	              s0 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c171); }
-	            }
-	            if (s0 === peg$FAILED) {
-	              if (peg$c172.test(input.charAt(peg$currPos))) {
-	                s0 = input.charAt(peg$currPos);
-	                peg$currPos++;
-	              } else {
-	                s0 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c173); }
-	              }
-	              if (s0 === peg$FAILED) {
-	                if (peg$c174.test(input.charAt(peg$currPos))) {
-	                  s0 = input.charAt(peg$currPos);
-	                  peg$currPos++;
-	                } else {
-	                  s0 = peg$FAILED;
-	                  if (peg$silentFails === 0) { peg$fail(peg$c175); }
-	                }
-	                if (s0 === peg$FAILED) {
-	                  if (peg$c176.test(input.charAt(peg$currPos))) {
-	                    s0 = input.charAt(peg$currPos);
-	                    peg$currPos++;
-	                  } else {
-	                    s0 = peg$FAILED;
-	                    if (peg$silentFails === 0) { peg$fail(peg$c177); }
-	                  }
-	                  if (s0 === peg$FAILED) {
-	                    if (peg$c178.test(input.charAt(peg$currPos))) {
-	                      s0 = input.charAt(peg$currPos);
-	                      peg$currPos++;
-	                    } else {
-	                      s0 = peg$FAILED;
-	                      if (peg$silentFails === 0) { peg$fail(peg$c179); }
-	                    }
-	                    if (s0 === peg$FAILED) {
-	                      if (peg$c180.test(input.charAt(peg$currPos))) {
-	                        s0 = input.charAt(peg$currPos);
-	                        peg$currPos++;
-	                      } else {
-	                        s0 = peg$FAILED;
-	                        if (peg$silentFails === 0) { peg$fail(peg$c181); }
-	                      }
-	                      if (s0 === peg$FAILED) {
-	                        if (peg$c182.test(input.charAt(peg$currPos))) {
-	                          s0 = input.charAt(peg$currPos);
-	                          peg$currPos++;
-	                        } else {
-	                          s0 = peg$FAILED;
-	                          if (peg$silentFails === 0) { peg$fail(peg$c183); }
-	                        }
-	                        if (s0 === peg$FAILED) {
-	                          if (peg$c184.test(input.charAt(peg$currPos))) {
-	                            s0 = input.charAt(peg$currPos);
-	                            peg$currPos++;
-	                          } else {
-	                            s0 = peg$FAILED;
-	                            if (peg$silentFails === 0) { peg$fail(peg$c185); }
-	                          }
-	                          if (s0 === peg$FAILED) {
-	                            if (peg$c186.test(input.charAt(peg$currPos))) {
-	                              s0 = input.charAt(peg$currPos);
-	                              peg$currPos++;
-	                            } else {
-	                              s0 = peg$FAILED;
-	                              if (peg$silentFails === 0) { peg$fail(peg$c187); }
-	                            }
-	                            if (s0 === peg$FAILED) {
-	                              if (peg$c188.test(input.charAt(peg$currPos))) {
-	                                s0 = input.charAt(peg$currPos);
-	                                peg$currPos++;
-	                              } else {
-	                                s0 = peg$FAILED;
-	                                if (peg$silentFails === 0) { peg$fail(peg$c189); }
-	                              }
-	                              if (s0 === peg$FAILED) {
-	                                if (peg$c190.test(input.charAt(peg$currPos))) {
-	                                  s0 = input.charAt(peg$currPos);
-	                                  peg$currPos++;
-	                                } else {
-	                                  s0 = peg$FAILED;
-	                                  if (peg$silentFails === 0) { peg$fail(peg$c191); }
-	                                }
-	                                if (s0 === peg$FAILED) {
-	                                  if (peg$c192.test(input.charAt(peg$currPos))) {
-	                                    s0 = input.charAt(peg$currPos);
-	                                    peg$currPos++;
-	                                  } else {
-	                                    s0 = peg$FAILED;
-	                                    if (peg$silentFails === 0) { peg$fail(peg$c193); }
-	                                  }
-	                                }
-	                              }
-	                            }
-	                          }
-	                        }
-	                      }
-	                    }
-	                  }
-	                }
-	              }
-	            }
-	          }
-	        }
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseNameChar() {
-	      var s0;
-	
-	      var key    = peg$currPos * 42 + 38,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$parseNameStartChar();
-	      if (s0 === peg$FAILED) {
-	        if (input.charCodeAt(peg$currPos) === 45) {
-	          s0 = peg$c21;
-	          peg$currPos++;
-	        } else {
-	          s0 = peg$FAILED;
-	          if (peg$silentFails === 0) { peg$fail(peg$c22); }
-	        }
-	        if (s0 === peg$FAILED) {
-	          if (input.charCodeAt(peg$currPos) === 46) {
-	            s0 = peg$c62;
-	            peg$currPos++;
-	          } else {
-	            s0 = peg$FAILED;
-	            if (peg$silentFails === 0) { peg$fail(peg$c63); }
-	          }
-	          if (s0 === peg$FAILED) {
-	            if (peg$c23.test(input.charAt(peg$currPos))) {
-	              s0 = input.charAt(peg$currPos);
-	              peg$currPos++;
-	            } else {
-	              s0 = peg$FAILED;
-	              if (peg$silentFails === 0) { peg$fail(peg$c24); }
-	            }
-	            if (s0 === peg$FAILED) {
-	              if (peg$c194.test(input.charAt(peg$currPos))) {
-	                s0 = input.charAt(peg$currPos);
-	                peg$currPos++;
-	              } else {
-	                s0 = peg$FAILED;
-	                if (peg$silentFails === 0) { peg$fail(peg$c195); }
-	              }
-	              if (s0 === peg$FAILED) {
-	                if (peg$c196.test(input.charAt(peg$currPos))) {
-	                  s0 = input.charAt(peg$currPos);
-	                  peg$currPos++;
-	                } else {
-	                  s0 = peg$FAILED;
-	                  if (peg$silentFails === 0) { peg$fail(peg$c197); }
-	                }
-	                if (s0 === peg$FAILED) {
-	                  if (peg$c198.test(input.charAt(peg$currPos))) {
-	                    s0 = input.charAt(peg$currPos);
-	                    peg$currPos++;
-	                  } else {
-	                    s0 = peg$FAILED;
-	                    if (peg$silentFails === 0) { peg$fail(peg$c199); }
-	                  }
-	                }
-	              }
-	            }
-	          }
-	        }
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parseName() {
-	      var s0, s1, s2, s3;
-	
-	      var key    = peg$currPos * 42 + 39,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      s0 = peg$currPos;
-	      s1 = peg$parseNameStartChar();
-	      if (s1 !== peg$FAILED) {
-	        s2 = [];
-	        s3 = peg$parseNameChar();
-	        while (s3 !== peg$FAILED) {
-	          s2.push(s3);
-	          s3 = peg$parseNameChar();
-	        }
-	        if (s2 !== peg$FAILED) {
-	          peg$savedPos = s0;
-	          s1 = peg$c200(s1, s2);
-	          s0 = s1;
-	        } else {
-	          peg$currPos = s0;
-	          s0 = peg$FAILED;
-	        }
-	      } else {
-	        peg$currPos = s0;
-	        s0 = peg$FAILED;
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	    function peg$parse_() {
-	      var s0, s1, s2;
-	
-	      var key    = peg$currPos * 42 + 40,
-	          cached = peg$resultsCache[key];
-	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
-	
-	        return cached.result;
-	      }
-	
-	      peg$silentFails++;
-	      s0 = peg$currPos;
-	      s1 = [];
-	      s2 = peg$parsewhitespace();
-	      while (s2 !== peg$FAILED) {
-	        s1.push(s2);
-	        s2 = peg$parsewhitespace();
-	      }
-	      if (s1 !== peg$FAILED) {
+	      if (s2 !== peg$FAILED) {
 	        peg$savedPos = s0;
-	        s1 = peg$c202(s1);
+	        s1 = peg$c165(s1);
+	        s0 = s1;
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
 	      }
-	      s0 = s1;
-	      peg$silentFails--;
-	      if (s0 === peg$FAILED) {
-	        s1 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c201); }
-	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	    peg$silentFails--;
+	    if (s0 === peg$FAILED) {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c128); }
 	    }
 	
-	    function peg$parsewhitespace() {
-	      var s0;
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
 	
-	      var key    = peg$currPos * 42 + 41,
-	          cached = peg$resultsCache[key];
+	    return s0;
+	  }
 	
-	      if (cached) {
-	        peg$currPos = cached.nextPos;
+	  function peg$parseNameStartChar() {
+	    var s0;
 	
-	        return cached.result;
-	      }
+	    var key    = peg$currPos * 42 + 37,
+	        cached = peg$resultsCache[key];
 	
-	      if (peg$c203.test(input.charAt(peg$currPos))) {
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    if (input.charCodeAt(peg$currPos) === 58) {
+	      s0 = peg$c18;
+	      peg$currPos++;
+	    } else {
+	      s0 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c19); }
+	    }
+	    if (s0 === peg$FAILED) {
+	      if (peg$c166.test(input.charAt(peg$currPos))) {
 	        s0 = input.charAt(peg$currPos);
 	        peg$currPos++;
 	      } else {
 	        s0 = peg$FAILED;
-	        if (peg$silentFails === 0) { peg$fail(peg$c204); }
+	        if (peg$silentFails === 0) { peg$fail(peg$c167); }
 	      }
-	
-	      peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
-	
-	      return s0;
-	    }
-	
-	
-	      var reservedWords = {
-	        'union': true,
-	        'except': true,
-	        'intersect': true,
-	        'and': true,
-	        'or': true,
-	        'not': true,
-	        'beginswith': true,
-	        'contains': true,
-	        'endswith': true,
-	        'like': true,
-	        'matches': true,
-	        // Word starts... covers !=, <=, etc
-	        '=': true,
-	        '!': true,
-	        '<': true,
-	        '>': true,
-	      }
-	
-	      function combine(left, right, label) {
-	        if (right) {
-	          var result = {};
-	          result[label] = [left, right];
-	          return result;
+	      if (s0 === peg$FAILED) {
+	        if (input.charCodeAt(peg$currPos) === 95) {
+	          s0 = peg$c168;
+	          peg$currPos++;
 	        } else {
-	          return left;
+	          s0 = peg$FAILED;
+	          if (peg$silentFails === 0) { peg$fail(peg$c169); }
 	        }
-	      }
-	
-	      var keywords = [];
-	
-	      function keywordCompare(a, b) {
-	        var aOffset = a.offset
-	        var bOffset = b.offset
-	
-	        if (aOffset !== bOffset) {
-	          return aOffset - bOffset;
-	        } else if (a.text.length !== b.text.length) {
-	          return a.text.length - b.text.length;
-	        } else if (a.label !== b.label) {
-	          if (a < b) {
-	            return -1;
+	        if (s0 === peg$FAILED) {
+	          if (peg$c170.test(input.charAt(peg$currPos))) {
+	            s0 = input.charAt(peg$currPos);
+	            peg$currPos++;
 	          } else {
-	            return 1;
+	            s0 = peg$FAILED;
+	            if (peg$silentFails === 0) { peg$fail(peg$c171); }
 	          }
-	        } else {
-	          return 0;
+	          if (s0 === peg$FAILED) {
+	            if (peg$c172.test(input.charAt(peg$currPos))) {
+	              s0 = input.charAt(peg$currPos);
+	              peg$currPos++;
+	            } else {
+	              s0 = peg$FAILED;
+	              if (peg$silentFails === 0) { peg$fail(peg$c173); }
+	            }
+	            if (s0 === peg$FAILED) {
+	              if (peg$c174.test(input.charAt(peg$currPos))) {
+	                s0 = input.charAt(peg$currPos);
+	                peg$currPos++;
+	              } else {
+	                s0 = peg$FAILED;
+	                if (peg$silentFails === 0) { peg$fail(peg$c175); }
+	              }
+	              if (s0 === peg$FAILED) {
+	                if (peg$c176.test(input.charAt(peg$currPos))) {
+	                  s0 = input.charAt(peg$currPos);
+	                  peg$currPos++;
+	                } else {
+	                  s0 = peg$FAILED;
+	                  if (peg$silentFails === 0) { peg$fail(peg$c177); }
+	                }
+	                if (s0 === peg$FAILED) {
+	                  if (peg$c178.test(input.charAt(peg$currPos))) {
+	                    s0 = input.charAt(peg$currPos);
+	                    peg$currPos++;
+	                  } else {
+	                    s0 = peg$FAILED;
+	                    if (peg$silentFails === 0) { peg$fail(peg$c179); }
+	                  }
+	                  if (s0 === peg$FAILED) {
+	                    if (peg$c180.test(input.charAt(peg$currPos))) {
+	                      s0 = input.charAt(peg$currPos);
+	                      peg$currPos++;
+	                    } else {
+	                      s0 = peg$FAILED;
+	                      if (peg$silentFails === 0) { peg$fail(peg$c181); }
+	                    }
+	                    if (s0 === peg$FAILED) {
+	                      if (peg$c182.test(input.charAt(peg$currPos))) {
+	                        s0 = input.charAt(peg$currPos);
+	                        peg$currPos++;
+	                      } else {
+	                        s0 = peg$FAILED;
+	                        if (peg$silentFails === 0) { peg$fail(peg$c183); }
+	                      }
+	                      if (s0 === peg$FAILED) {
+	                        if (peg$c184.test(input.charAt(peg$currPos))) {
+	                          s0 = input.charAt(peg$currPos);
+	                          peg$currPos++;
+	                        } else {
+	                          s0 = peg$FAILED;
+	                          if (peg$silentFails === 0) { peg$fail(peg$c185); }
+	                        }
+	                        if (s0 === peg$FAILED) {
+	                          if (peg$c186.test(input.charAt(peg$currPos))) {
+	                            s0 = input.charAt(peg$currPos);
+	                            peg$currPos++;
+	                          } else {
+	                            s0 = peg$FAILED;
+	                            if (peg$silentFails === 0) { peg$fail(peg$c187); }
+	                          }
+	                          if (s0 === peg$FAILED) {
+	                            if (peg$c188.test(input.charAt(peg$currPos))) {
+	                              s0 = input.charAt(peg$currPos);
+	                              peg$currPos++;
+	                            } else {
+	                              s0 = peg$FAILED;
+	                              if (peg$silentFails === 0) { peg$fail(peg$c189); }
+	                            }
+	                            if (s0 === peg$FAILED) {
+	                              if (peg$c190.test(input.charAt(peg$currPos))) {
+	                                s0 = input.charAt(peg$currPos);
+	                                peg$currPos++;
+	                              } else {
+	                                s0 = peg$FAILED;
+	                                if (peg$silentFails === 0) { peg$fail(peg$c191); }
+	                              }
+	                              if (s0 === peg$FAILED) {
+	                                if (peg$c192.test(input.charAt(peg$currPos))) {
+	                                  s0 = input.charAt(peg$currPos);
+	                                  peg$currPos++;
+	                                } else {
+	                                  s0 = peg$FAILED;
+	                                  if (peg$silentFails === 0) { peg$fail(peg$c193); }
+	                                }
+	                              }
+	                            }
+	                          }
+	                        }
+	                      }
+	                    }
+	                  }
+	                }
+	              }
+	            }
+	          }
 	        }
 	      }
-	
-	      function keyword(label, textValue) {
-	        textValue = textValue === undefined ? text() : textValue;
-	
-	        var offsetValue = location().start.offset;
-	        var length = keywords.length - 1;
-	        while (length >= 0 && keywords[length].offset === offsetValue) {
-	          keywords.pop();
-	          length--;
-	        }
-	
-	        keywords.push({
-	          label: label,
-	          offset : offsetValue,
-	          text : textValue
-	        });
-	
-	        keywords.sort(keywordCompare);
-	      }
-	
-	
-	    peg$result = peg$startRuleFunction();
-	
-	    if (peg$result !== peg$FAILED && peg$currPos === input.length) {
-	      return peg$result;
-	    } else {
-	      if (peg$result !== peg$FAILED && peg$currPos < input.length) {
-	        peg$fail({ type: "end", description: "end of input" });
-	      }
-	
-	      throw peg$buildException(
-	        null,
-	        peg$maxFailExpected,
-	        peg$maxFailPos < input.length ? input.charAt(peg$maxFailPos) : null,
-	        peg$maxFailPos < input.length
-	          ? peg$computeLocation(peg$maxFailPos, peg$maxFailPos + 1)
-	          : peg$computeLocation(peg$maxFailPos, peg$maxFailPos)
-	      );
 	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
 	  }
 	
-	  return {
-	    SyntaxError: peg$SyntaxError,
-	    parse:       peg$parse
-	  };
-	})();
+	  function peg$parseNameChar() {
+	    var s0;
+	
+	    var key    = peg$currPos * 42 + 38,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$parseNameStartChar();
+	    if (s0 === peg$FAILED) {
+	      if (input.charCodeAt(peg$currPos) === 45) {
+	        s0 = peg$c21;
+	        peg$currPos++;
+	      } else {
+	        s0 = peg$FAILED;
+	        if (peg$silentFails === 0) { peg$fail(peg$c22); }
+	      }
+	      if (s0 === peg$FAILED) {
+	        if (input.charCodeAt(peg$currPos) === 46) {
+	          s0 = peg$c62;
+	          peg$currPos++;
+	        } else {
+	          s0 = peg$FAILED;
+	          if (peg$silentFails === 0) { peg$fail(peg$c63); }
+	        }
+	        if (s0 === peg$FAILED) {
+	          if (peg$c23.test(input.charAt(peg$currPos))) {
+	            s0 = input.charAt(peg$currPos);
+	            peg$currPos++;
+	          } else {
+	            s0 = peg$FAILED;
+	            if (peg$silentFails === 0) { peg$fail(peg$c24); }
+	          }
+	          if (s0 === peg$FAILED) {
+	            if (peg$c194.test(input.charAt(peg$currPos))) {
+	              s0 = input.charAt(peg$currPos);
+	              peg$currPos++;
+	            } else {
+	              s0 = peg$FAILED;
+	              if (peg$silentFails === 0) { peg$fail(peg$c195); }
+	            }
+	            if (s0 === peg$FAILED) {
+	              if (peg$c196.test(input.charAt(peg$currPos))) {
+	                s0 = input.charAt(peg$currPos);
+	                peg$currPos++;
+	              } else {
+	                s0 = peg$FAILED;
+	                if (peg$silentFails === 0) { peg$fail(peg$c197); }
+	              }
+	              if (s0 === peg$FAILED) {
+	                if (peg$c198.test(input.charAt(peg$currPos))) {
+	                  s0 = input.charAt(peg$currPos);
+	                  peg$currPos++;
+	                } else {
+	                  s0 = peg$FAILED;
+	                  if (peg$silentFails === 0) { peg$fail(peg$c199); }
+	                }
+	              }
+	            }
+	          }
+	        }
+	      }
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parseName() {
+	    var s0, s1, s2, s3;
+	
+	    var key    = peg$currPos * 42 + 39,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    s0 = peg$currPos;
+	    s1 = peg$parseNameStartChar();
+	    if (s1 !== peg$FAILED) {
+	      s2 = [];
+	      s3 = peg$parseNameChar();
+	      while (s3 !== peg$FAILED) {
+	        s2.push(s3);
+	        s3 = peg$parseNameChar();
+	      }
+	      if (s2 !== peg$FAILED) {
+	        peg$savedPos = s0;
+	        s1 = peg$c200(s1, s2);
+	        s0 = s1;
+	      } else {
+	        peg$currPos = s0;
+	        s0 = peg$FAILED;
+	      }
+	    } else {
+	      peg$currPos = s0;
+	      s0 = peg$FAILED;
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parse_() {
+	    var s0, s1, s2;
+	
+	    var key    = peg$currPos * 42 + 40,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    peg$silentFails++;
+	    s0 = peg$currPos;
+	    s1 = [];
+	    s2 = peg$parsewhitespace();
+	    while (s2 !== peg$FAILED) {
+	      s1.push(s2);
+	      s2 = peg$parsewhitespace();
+	    }
+	    if (s1 !== peg$FAILED) {
+	      peg$savedPos = s0;
+	      s1 = peg$c202(s1);
+	    }
+	    s0 = s1;
+	    peg$silentFails--;
+	    if (s0 === peg$FAILED) {
+	      s1 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c201); }
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	  function peg$parsewhitespace() {
+	    var s0;
+	
+	    var key    = peg$currPos * 42 + 41,
+	        cached = peg$resultsCache[key];
+	
+	    if (cached) {
+	      peg$currPos = cached.nextPos;
+	
+	      return cached.result;
+	    }
+	
+	    if (peg$c203.test(input.charAt(peg$currPos))) {
+	      s0 = input.charAt(peg$currPos);
+	      peg$currPos++;
+	    } else {
+	      s0 = peg$FAILED;
+	      if (peg$silentFails === 0) { peg$fail(peg$c204); }
+	    }
+	
+	    peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
+	
+	    return s0;
+	  }
+	
+	
+	    var reservedWords = {
+	      'union': true,
+	      'except': true,
+	      'intersect': true,
+	      'and': true,
+	      'or': true,
+	      'not': true,
+	      'beginswith': true,
+	      'contains': true,
+	      'endswith': true,
+	      'like': true,
+	      'matches': true,
+	      // Word starts... covers !=, <=, etc
+	      '=': true,
+	      '!': true,
+	      '<': true,
+	      '>': true,
+	    }
+	
+	    function combine(left, right, label) {
+	      if (right) {
+	        var result = {};
+	        result[label] = [left, right];
+	        return result;
+	      } else {
+	        return left;
+	      }
+	    }
+	
+	    var keywords = [];
+	
+	    function keywordCompare(a, b) {
+	      var aOffset = a.offset
+	      var bOffset = b.offset
+	
+	      if (aOffset !== bOffset) {
+	        return aOffset - bOffset;
+	      } else if (a.text.length !== b.text.length) {
+	        return a.text.length - b.text.length;
+	      } else if (a.label !== b.label) {
+	        if (a < b) {
+	          return -1;
+	        } else {
+	          return 1;
+	        }
+	      } else {
+	        return 0;
+	      }
+	    }
+	
+	    function keyword(label, textValue) {
+	      textValue = textValue === undefined ? text() : textValue;
+	
+	      var offsetValue = location().start.offset;
+	      var length = keywords.length - 1;
+	      while (length >= 0 && keywords[length].offset === offsetValue) {
+	        keywords.pop();
+	        length--;
+	      }
+	
+	      keywords.push({
+	        label: label,
+	        offset : offsetValue,
+	        text : textValue
+	      });
+	
+	      keywords.sort(keywordCompare);
+	    }
+	
+	
+	  peg$result = peg$startRuleFunction();
+	
+	  if (peg$result !== peg$FAILED && peg$currPos === input.length) {
+	    return peg$result;
+	  } else {
+	    if (peg$result !== peg$FAILED && peg$currPos < input.length) {
+	      peg$fail(peg$endExpectation());
+	    }
+	
+	    throw peg$buildStructuredError(
+	      peg$maxFailExpected,
+	      peg$maxFailPos < input.length ? input.charAt(peg$maxFailPos) : null,
+	      peg$maxFailPos < input.length
+	        ? peg$computeLocation(peg$maxFailPos, peg$maxFailPos + 1)
+	        : peg$computeLocation(peg$maxFailPos, peg$maxFailPos)
+	    );
+	  }
+	}
+	
+	module.exports = {
+	  SyntaxError: peg$SyntaxError,
+	  parse:       peg$parse
+	};
 
 
 /***/ },
-/* 183 */
+/* 188 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var Mutation, assert;
@@ -36993,8 +38238,8 @@ var birchoutline =
 	    var mutation;
 	    assert(addedItems.length > 0 || removedItems.length > 0, 'Children added or removed');
 	    mutation = new Mutation(target, Mutation.CHILDREN_CHANGED);
-	    mutation.addedItems = addedItems || [];
-	    mutation.removedItems = removedItems || [];
+	    mutation.addedItems = (addedItems != null ? addedItems.slice() : void 0) || [];
+	    mutation.removedItems = (removedItems != null ? removedItems.slice() : void 0) || [];
 	    mutation.previousSibling = previousSibling;
 	    mutation.nextSibling = nextSibling;
 	    return mutation;
@@ -37096,7 +38341,7 @@ var birchoutline =
 	          this.target.removeChildren(this.addedItems);
 	        }
 	        if (this.removedItems.length) {
-	          return this.target.insertChildrenBefore(this.removedItems, this.nextSibling);
+	          return this.target.insertChildrenBefore(this.removedItems, this.nextSibling, true);
 	        }
 	    }
 	  };
@@ -37147,7 +38392,169 @@ var birchoutline =
 
 
 /***/ },
-/* 184 */
+/* 189 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(Buffer) {(function () {
+	    var ctph = {};
+	    var isBrowser = false;
+	    if (typeof module !== 'undefined' && module.exports) {
+	        exports = module.exports = ctph;
+	    } else {//for browser
+	        this.ctph = ctph;
+	        isBrowser = true;
+	    }
+	
+	    var HASH_PRIME = 0x01000193;
+	    var HASH_INIT = 0x28021967;
+	    var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+	
+	    //refer http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+	    function toUTF8Array (str) {
+	        var utf8 = unescape(encodeURIComponent(str));
+	        var arr = [];
+	        for (var i = 0; i < utf8.length; i++) {
+	            arr.push(utf8.charCodeAt(i));
+	        }
+	        return arr;
+	    }
+	
+	    //FNV-1 hash
+	    function fnv (base, b) {
+	        return ((base * HASH_PRIME) ^ b) >>> 0;
+	    }
+	
+	    //Based on https://github.com/hiddentao/fast-levenshtein
+	    function levenshtein (str1, str2) {
+	        // base cases
+	        if (str1 === str2) return 0;
+	        if (str1.length === 0) return str2.length;
+	        if (str2.length === 0) return str1.length;
+	
+	        // two rows
+	        var prevRow  = new Array(str2.length + 1),
+	            curCol, nextCol, i, j, tmp;
+	
+	        // initialise previous row
+	        for (i=0; i<prevRow.length; ++i) {
+	            prevRow[i] = i;
+	        }
+	
+	        // calculate current row distance from previous row
+	        for (i=0; i<str1.length; ++i) {
+	            nextCol = i + 1;
+	
+	            for (j=0; j<str2.length; ++j) {
+	                curCol = nextCol;
+	
+	                // substution
+	                nextCol = prevRow[j] + ( (str1.charAt(i) === str2.charAt(j)) ? 0 : 1 );
+	                // insertion
+	                tmp = curCol + 1;
+	                if (nextCol > tmp) {
+	                    nextCol = tmp;
+	                }
+	                // deletion
+	                tmp = prevRow[j + 1] + 1;
+	                if (nextCol > tmp) {
+	                    nextCol = tmp;
+	                }
+	
+	                // copy current col value into previous (in preparation for next iteration)
+	                prevRow[j] = curCol;
+	            }
+	
+	            // copy last col value into previous (in preparation for next iteration)
+	            prevRow[j] = nextCol;
+	        }
+	        return nextCol;
+	    }
+	
+	    function RollHash () {
+	        this.x = 0;
+	        this.y = 0;
+	        this.z = 0;
+	        this.c = 0;
+	        this.window = new Array(7);
+	    }
+	    RollHash.prototype.update = function (d) {
+	        this.y -= this.x;
+	        this.y += 7 * d;
+	        this.x += d;
+	        this.x -= this.window[this.c % 7] || 0;
+	        this.window[this.c % 7] = d;
+	        this.c++;
+	        this.z = (this.z << 5)>>>0; // `>>>0` for force unsigned
+	        this.z = (this.z ^ d)>>>0;
+	    };
+	    RollHash.prototype.sum = function () {
+	        return (this.x + this.y + this.z) >>> 0;
+	    };
+	
+	    function piecewiseHash (bytes, triggerValue) {
+	        var signatures = ['',''];
+	        var h1 = HASH_INIT;
+	        var h2 = HASH_INIT;
+	        var rh = new RollHash();
+	        for (var i = 0, len = bytes.length; i < len; i++) {
+	            h1 = fnv(h1, bytes[i]);
+	            h2 = fnv(h2, bytes[i]);
+	            rh.update(bytes[i]);
+	            if (i === len - 1 || rh.sum() % triggerValue === (triggerValue - 1)) {
+	                signatures[0] += B64.charAt(h1&63);
+	                h1 = HASH_INIT;
+	            }
+	            if (i === len - 1 || rh.sum() % (triggerValue * 2) === (triggerValue * 2 - 1) ) {
+	                signatures[1] += B64.charAt(h2&63);
+	                h2 = HASH_INIT;
+	            }
+	        }
+	        return signatures;
+	    }
+	
+	    //Context Triggered Piecewise Hash (CTPH)
+	    function digest (bytes) {
+	        var minb = 3;
+	        var bi = Math.ceil(Math.log(bytes.length/(64*minb))/Math.log(2));
+	        bi = Math.max(3, bi);
+	        var signatures = piecewiseHash(bytes, minb << bi);
+	        while (bi>0 && signatures[0].length < 32){
+	            signatures = piecewiseHash(bytes, minb << --bi);
+	        }
+	        return B64.charAt(bi) + ':' + signatures[0] + ':' + signatures[1];
+	    }
+	
+	    function matchScore (s1, s2) {
+	        var e = levenshtein(s1, s2);
+	        var r = 1 - e/Math.max(s1.length ,s2.length);
+	        return r * 100;
+	    }
+	
+	    ctph.digest = function (data) {
+	        if (typeof data === 'string') {
+	            data = isBrowser?toUTF8Array(data):new Buffer(data).toJSON().data;
+	        }
+	        return digest(data);
+	    };
+	
+	    ctph.similarity = function (d1, d2) {
+	        var b1 = B64.indexOf(d1.charAt(0));
+	        var b2 = B64.indexOf(d2.charAt(0));
+	        if (b1 > b2) return arguments.callee(d2, d1);
+	
+	        if (Math.abs(b1-b2) > 1) {
+	            return 0;
+	        } else if (b1 === b2) {
+	            return matchScore(d1.split(':')[1], d2.split(':')[1]);
+	        } else {
+	            return matchScore(d1.split(':')[2], d2.split(':')[1]);
+	        }
+	    };
+	})();
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(41).Buffer))
+
+/***/ },
+/* 190 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var AttributedString, Birch, ElementType, Item, assert, beginSerialization, beginSerializeItem, createItem, deserializeItems, dom, endSerialization, endSerializeItem, serializeItemBody;
@@ -37351,7 +38758,7 @@ var birchoutline =
 
 
 /***/ },
-/* 185 */
+/* 191 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var Item, _, assert, beginSerialization, beginSerializeItem, createItem, deserializeItems, dom, endSerialization, endSerializeItem, htmlparser, serializeItemBody;
@@ -37499,18 +38906,18 @@ var birchoutline =
 
 
 /***/ },
-/* 186 */
+/* 192 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var changeDelegate, deserializeItem, deserializeItems, repeat, serializeItemBody, tagsHelper, text;
 	
-	tagsHelper = __webpack_require__(187);
+	tagsHelper = __webpack_require__(193);
 	
-	changeDelegate = __webpack_require__(188);
+	changeDelegate = __webpack_require__(194);
 	
 	repeat = __webpack_require__(9).repeat;
 	
-	text = __webpack_require__(191);
+	text = __webpack_require__(197);
 	
 	serializeItemBody = function(item, bodyAttributedString, options, context) {
 	  var attributeName, bodyString, encodedAttributes, i, itemClone, len, ref;
@@ -37564,7 +38971,7 @@ var birchoutline =
 	};
 	
 	module.exports = {
-	  changeDelegate: __webpack_require__(188),
+	  changeDelegate: __webpack_require__(194),
 	  beginSerialization: text.beginSerialization,
 	  beginSerializeItem: text.beginSerializeItem,
 	  serializeItemBody: serializeItemBody,
@@ -37581,7 +38988,7 @@ var birchoutline =
 
 
 /***/ },
-/* 187 */
+/* 193 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var Item, addTag, encodeNameForAttributeName, encodeTag, encodesAttributeName, parseTags, removeTag, reservedTags, syncTagAttributeToItemBody, tagRange, tagRegex, tagRegexString, tagValueRegex, tagValueRegexString, tagWordCharsRegex, tagWordRegexString, tagWordStartCharsRegex, trailingTagsRegex;
@@ -37602,7 +39009,7 @@ var birchoutline =
 	
 	tagRegex = new RegExp(tagRegexString, 'g');
 	
-	trailingTagsRegex = new RegExp("(" + tagRegexString + ")+$", 'g');
+	trailingTagsRegex = new RegExp("(" + tagRegexString + ")+\\s*$", 'g');
 	
 	reservedTags = {
 	  'data-id': true,
@@ -37646,7 +39053,7 @@ var birchoutline =
 	      length: 0
 	    };
 	  }
-	  if (range.location > 0) {
+	  if (range.location > 0 && !/\s+$/.test(item.bodyString)) {
 	    tagString = ' ' + tagString;
 	  }
 	  return item.replaceBodyRange(range.location, range.length, tagString);
@@ -37723,16 +39130,16 @@ var birchoutline =
 
 
 /***/ },
-/* 188 */
+/* 194 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var highlightItemBody, processItemDidChangeAttribute, processItemDidChangeBody, smartLinks, tagsHelper, typesHelper;
 	
-	smartLinks = __webpack_require__(189);
+	smartLinks = __webpack_require__(195);
 	
-	typesHelper = __webpack_require__(190);
+	typesHelper = __webpack_require__(196);
 	
-	tagsHelper = __webpack_require__(187);
+	tagsHelper = __webpack_require__(193);
 	
 	processItemDidChangeAttribute = function(item, attribute, value, oldValue) {
 	  var startBodyString;
@@ -37856,7 +39263,7 @@ var birchoutline =
 
 
 /***/ },
-/* 189 */
+/* 195 */
 /***/ function(module, exports) {
 
 	var emailRegex, highlightLinks, pathRegex, webRegex;
@@ -37912,12 +39319,12 @@ var birchoutline =
 
 
 /***/ },
-/* 190 */
+/* 196 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var parseType, projectRegex, syncTypeAttributeToItemBody, tagsHelper, taskRegex;
 	
-	tagsHelper = __webpack_require__(187);
+	tagsHelper = __webpack_require__(193);
 	
 	taskRegex = /^([\-+*])\s/;
 	
@@ -37961,7 +39368,7 @@ var birchoutline =
 
 
 /***/ },
-/* 191 */
+/* 197 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var Item, _parseLinesAndNormalizeIndentation, beginSerialization, beginSerializeItem, deserializeItem, deserializeItemBody, deserializeItems, emptyEncodeLastItem, endSerialization, endSerializeItem, repeat, serializeItemBody;
@@ -38111,7 +39518,31 @@ var birchoutline =
 
 
 /***/ },
-/* 192 */
+/* 198 */
+/***/ function(module, exports) {
+
+	var deserializeItems;
+	
+	deserializeItems = function(pathList, outline, options) {
+	  var each, filenames, i, item, items, len;
+	  filenames = pathList.split('\n');
+	  items = [];
+	  for (i = 0, len = filenames.length; i < len; i++) {
+	    each = filenames[i];
+	    item = outline.createItem();
+	    item.bodyString = each.trim().replace(/[ ]/g, '\\ ');
+	    items.push(item);
+	  }
+	  return items;
+	};
+	
+	module.exports = {
+	  deserializeItems: deserializeItems
+	};
+
+
+/***/ },
+/* 199 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var Emitter, UndoManager, assert;
@@ -38312,13 +39743,13 @@ var birchoutline =
 
 
 /***/ },
-/* 193 */
+/* 200 */
 /***/ function(module, exports, __webpack_require__) {
 
-	module.exports = __webpack_require__(194);
+	module.exports = __webpack_require__(201);
 
 /***/ },
-/* 194 */
+/* 201 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {/*
@@ -38326,8 +39757,8 @@ var birchoutline =
 	 * by Dylan Greene
 	 */
 	
-	var alphabet = __webpack_require__(195),
-	    encode = __webpack_require__(197);
+	var alphabet = __webpack_require__(202),
+	    encode = __webpack_require__(204);
 	
 	// Ignore all milliseconds before a certain time to reduce the size of the date entropy without sacrificing uniqueness.
 	// This number should be updated every year or so to keep the generated id short.
@@ -38435,10 +39866,10 @@ var birchoutline =
 	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(15)))
 
 /***/ },
-/* 195 */
+/* 202 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var random = __webpack_require__(196);
+	var random = __webpack_require__(203);
 	
 	var ORIGINAL = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-';
 	var alphabet;
@@ -38533,7 +39964,7 @@ var birchoutline =
 
 
 /***/ },
-/* 196 */
+/* 203 */
 /***/ function(module, exports) {
 
 	
@@ -38558,7 +39989,7 @@ var birchoutline =
 	};
 
 /***/ },
-/* 197 */
+/* 204 */
 /***/ function(module, exports) {
 
 	function encode(lookup, number) {
@@ -38578,7 +40009,7 @@ var birchoutline =
 	module.exports = encode;
 
 /***/ },
-/* 198 */
+/* 205 */
 /***/ function(module, exports) {
 
 	var Extensions;
@@ -38586,7 +40017,7 @@ var birchoutline =
 	module.exports = Extensions = (function() {
 	  Extensions.PRIORITY_NORMAL = 0;
 	
-	  Extensions.PRIORITY_FIRST = -1.;
+	  Extensions.PRIORITY_FIRST = -1;
 	
 	  Extensions.PRIORITY_LAST = 1;
 	
@@ -38641,7 +40072,7 @@ var birchoutline =
 
 
 /***/ },
-/* 199 */
+/* 206 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var CompositeDisposable, Emitter, ItemPathQuery, _, ref, util;
